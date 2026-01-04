@@ -41,9 +41,13 @@
 <body>
     <div id="root"></div>
 
+    <!-- 
+      We use type="text/babel" so Babel Standalone processes the file.
+      We remove data-type="module" to prevent the browser from trying to 
+      run the .tsx file natively before Babel can fix it.
+    -->
     <script 
       type="text/babel" 
-      data-type="module" 
       data-presets="react,typescript" 
       src="./index.tsx"
     ></script>

@@ -8,8 +8,8 @@ export const DASHBOARD_CONFIG = {
     title: "Expenses",
     description: "This section details where taxpayer money is going. Interpreting this data involves looking at department-level spending vs. budgeted amounts.",
     items: [
-      { name: "Expenses by Fund", path: "/dashboards/expenses/fund141/index.html" },
-      { name: "2023 General Operations", path: "/dashboards/expenses/genops2023/index.html" }
+      { name: "Expenses by Fund", path: "/Attempt12/dashboards/expenses/index.html"" },
+      
     ]
   },
   revenues: {
