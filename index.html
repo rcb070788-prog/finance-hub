@@ -5,13 +5,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Concerned Citizens of MC</title>
+    <!-- Tailwind for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 
+      BABEL STANDALONE:
+      This allows the browser to understand .tsx files directly.
+      It translates the code on-the-fly so it "just works" on static hosts like Netlify.
+    -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
     <style>
       body {
         background-color: #f8fafc;
       }
     </style>
-<script type="importmap">
+
+    <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@19.2.3",
@@ -25,7 +35,16 @@
 </head>
 <body>
     <div id="root"></div>
-    <!-- This script tag is the "entry point" that starts your app -->
-    <script type="module" src="./index.tsx"></script>
+
+    <!-- 
+      We use type="text/babel" and data-type="module" so the browser knows 
+      to let Babel handle the translation of this file.
+    -->
+    <script 
+      type="text/babel" 
+      data-type="module" 
+      data-presets="react,typescript" 
+      src="./index.tsx"
+    ></script>
 </body>
 </html>
