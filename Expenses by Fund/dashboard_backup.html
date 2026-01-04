@@ -1,0 +1,3827 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Multi-Fund Expenses (FY05–FY24)</title>
+  <style>
+    :root{
+      --bg:#0b0d12;
+      --panel:#111522;
+      --muted:#8ea0b5;
+      --text:#e7eef8;
+      --line:#24324a;
+      --accent:#4aa3ff;
+      --danger:#ff5a6a;
+      --ok:#44d17a;
+      --chip:#1b2740;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font:14px/1.35 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    }
+    header{
+      padding:14px 14px 8px;
+      border-bottom:1px solid var(--line);
+      position:sticky; top:0;
+      background:linear-gradient(180deg, rgba(11,13,18,.98), rgba(11,13,18,.88));
+      backdrop-filter: blur(10px);
+      z-index:10;
+    }
+    h1{
+      margin:0 0 6px 0;
+      font-size:16px;
+      font-weight:700;
+      letter-spacing:.2px;
+    }
+    .sub{
+      color:var(--muted);
+      font-size:12px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+        .wrap{
+      padding:12px 14px 24px;
+      max-width:none;      /* allow full-width layouts on desktop */
+      width:100%;
+      margin:0 auto;
+    }
+
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+    .panel{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:12px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.25);
+    }
+    .panel + .panel{margin-top:12px;}
+    label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px;}
+    select, button, input[type="checkbox"]{
+      font:inherit;
+    }
+    select{
+      background:#0f1422;
+      color:var(--text);
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px 10px;
+      min-width: 240px;
+      outline:none;
+    }
+    button{
+      background: #0f1422;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      cursor:pointer;
+    }
+    button.primary{
+      background: rgba(74,163,255,.12);
+      border-color: rgba(74,163,255,.45);
+    }
+    button:disabled{
+      opacity:.45;
+      cursor:not-allowed;
+    }
+    .tabs{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .tab{
+      padding:8px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:#0f1422;
+      color:var(--muted);
+      cursor:pointer;
+      user-select:none;
+    }
+    .tab.active{
+      color:var(--text);
+      border-color: rgba(74,163,255,.55);
+      background: rgba(74,163,255,.12);
+    }
+    .chips{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
+    .chip{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      background: var(--chip);
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:6px 10px;
+      font-size:12px;
+      color:var(--muted);
+    }
+    .chip b{color:var(--text); font-weight:600;}
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+    }
+        @media (min-width: 980px){
+      /* Make the chart as wide as possible while keeping the audit panel readable */
+      .grid{grid-template-columns: 1fr minmax(280px, 360px);}
+    }
+
+    .chartWrap{
+      position:relative;
+      width:100%;
+      overflow:hidden;
+      border-radius:16px;
+      border:1px solid var(--line);
+      background: #0d1220;
+    }
+    .chartHeader{
+      padding:10px 12px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .chartTitle{
+      font-weight:700;
+      letter-spacing:.2px;
+    }
+    .chartSubtitle{
+      color:var(--muted);
+      font-size:12px;
+      margin-top:2px;
+    }
+        svg{display:block; width:100%; height: var(--chartH, 360px);}
+
+                /* Detail level toggles (segmented) + conditional filters */
+    .detailLevel{display:flex; flex-direction:column; gap:6px; min-width:240px;}
+
+    /* Center the header above the toggles */
+    #detailLevelField > .detailLevelTitle{
+      width:100%;
+      text-align:center;
+      margin:0;
+    }
+
+        /* Segmented toggles (NO outer rail/box) */
+    #detailLevelField .radioRow{
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;         /* wraps on very narrow screens */
+      align-items:center;
+      justify-content:center;
+      padding:0;
+      border:0;
+      border-radius:0;
+      background:transparent;
+    }
+
+
+    /* Each option looks like a toggle button */
+    #detailLevelField .radioPill{
+      position:relative;
+      display:inline-flex;
+      align-items:center;
+      cursor:pointer;
+      user-select:none;
+      padding:0;
+      border:0;
+      background:transparent;
+    }
+
+    /* Hide the native radio circle (keep accessibility + checked state) */
+    #detailLevelField .radioPill input{
+      position:absolute;
+      opacity:0;
+      width:1px;
+      height:1px;
+      pointer-events:none;
+    }
+
+    /* The visible “button face” */
+    #detailLevelField .radioPill span{
+      display:block;
+      padding:8px 12px;
+      border-radius:999px;
+      color:var(--muted);
+      line-height:1;
+      white-space:nowrap;
+      transition:background .15s ease, color .15s ease, box-shadow .15s ease;
+    }
+
+    /* Selected state (works with or without JS adding .active) */
+    #detailLevelField .radioPill input:checked + span,
+    #detailLevelField .radioPill.active span{
+      color:var(--text);
+      background:rgba(255,255,255,.12);
+      box-shadow:0 0 0 1px rgba(255,255,255,.16) inset;
+    }
+
+    /* Keyboard focus */
+    #detailLevelField .radioPill:focus-within span{
+      box-shadow:0 0 0 2px rgba(255,255,255,.22);
+    }
+
+
+    .detailWrap{display:none;}
+            /* --- Toolbox layout tweaks --- */
+    #toolboxRow{
+      justify-content:center;   /* keeps the dropdowns centered in the toolbox */
+      align-items:flex-end;
+      margin-top:0 !important;  /* override inline margin-top so toolbox starts higher */
+    }
+
+    /* Detail Level in the panel header row: keep it inline with tabs + buttons */
+    .panel > .row:first-child #detailLevelField{
+      flex-direction:row;
+      align-items:center;
+      gap:10px;
+      min-width:0;
+    }
+    .panel > .row:first-child #detailLevelField > .detailLevelTitle{
+      width:auto;
+      text-align:left;
+      margin:0;
+      white-space:nowrap;
+    }
+    .panel > .row:first-child #detailLevelField .radioRow{
+      justify-content:flex-start;
+    }
+    @media (max-width:520px){
+      .panel > .row:first-child #detailLevelField{
+        flex:1 1 100%;
+        justify-content:center;
+      }
+      .panel > .row:first-child #detailLevelField .radioRow{
+        justify-content:center;
+      }
+    }
+
+
+    /* Visually move the radios ABOVE the dropdowns (so dropdowns can share a row) */
+    #toolboxRow > #detailLevelField{
+      order:-1;
+      flex: 1 1 100%;           /* force its own line */
+      min-width:0;              /* allow shrinking on small screens */
+      margin-bottom:0;          /* pull the dropdown row up closer under “Detail Level” */
+    }
+    #toolboxRow > #detailLevelField .radioRow{
+      justify-content:center;
+    }
+
+
+
+    /* Visually move the radios ABOVE the dropdowns (so dropdowns can share a row) */
+    #toolboxRow > #detailLevelField{
+      order:-1;
+      flex: 1 1 100%;           /* force its own line */
+      min-width:0;              /* allow shrinking on small screens */
+      margin-bottom:2px;
+    }
+    #toolboxRow > #detailLevelField .radioRow{
+      justify-content:center;
+    }
+
+    /* Make the 4 dropdown blocks (Fund + Program + Dept + Line) fit on one line when width allows */
+    #toolboxRow > #fundWrap,
+    #toolboxRow > .detailWrap{
+      flex: 1 1 200px;          /* shrink/grow to share the row */
+      min-width: 160px;         /* prevents unusably tiny selects */
+      max-width: 320px;         /* keeps them from getting comically wide */
+    }
+
+    /* Let selects shrink inside flex items; attempt multi-line option text where supported */
+    #toolboxRow select{
+      min-width:0;
+      width:100%;
+      white-space:normal;
+    }
+    #toolboxRow option{
+      white-space:normal;
+    }
+
+    .detailWrap select{min-width:240px;}
+
+    @media (max-width:520px){
+      .detailLevel{min-width:0; width:100%;}
+      .detailWrap{width:100%;}
+      .detailWrap select{width:100%; min-width:0;}
+    }
+
+
+    /* Mobile: avoid horizontal scroll */
+    @media (max-width:520px){
+      .toggleField{min-width:0; width:100%;}
+      .toggleField select{width:100%; min-width:0;}
+    }
+
+    .tooltip{
+      position:absolute;
+      left:12px; top:12px;
+      background: rgba(15,20,34,.92);
+      border:1px solid rgba(36,50,74,.9);
+      border-radius:14px;
+      padding:10px 10px;
+      max-width: min(340px, calc(100% - 24px));
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      display:none;
+      z-index: 50;           /* ensure it sits above the SVG */
+      pointer-events: auto;  /* allow clicking its buttons */
+    }
+    .tooltip .trow{display:flex; justify-content:space-between; gap:10px;}
+    .tooltip .trow + .trow{margin-top:6px;}
+    .tooltip .muted{color:var(--muted); font-size:12px;}
+.tooltip a{
+  color:var(--muted);
+  text-decoration: underline;
+  max-width: 240px;
+  overflow:hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display:inline-block;
+  text-align:right;
+}
+
+    .tooltip .val{font-weight:700;}
+    .tooltip .btnrow{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+    .small{
+      font-size:12px;
+      color:var(--muted);
+    }
+    .audit{
+      font-size:12px;
+      color:var(--muted);
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .audit .ok{color:var(--ok)}
+    .audit .bad{color:var(--danger)}
+    .audit code{color:#cfe3ff}
+    .footerNote{color:var(--muted); font-size:12px; margin-top:10px;}
+    </style>
+  <style>
+    /* --- Layout/tooltip hardening (full-width + no clipping) --- */
+    .wrap{max-width:none;}
+    .chartWrap{overflow:visible;}
+
+    /* Desktop: make chart full-width by stacking the audit panel below */
+    @media (min-width: 980px){
+      .grid{grid-template-columns: 1fr;}
+    }
+
+    /* Ensure tooltip can paint above adjacent panels */
+    .grid > .panel:first-child{position:relative; z-index:5;}
+    </style>
+
+  <style>
+    /* Lift toolbox up one more “row” on wider screens; keep mobile safe */
+    #toolboxRow{ margin-top:0 !important; } /* overrides inline margin-top */
+    @media (min-width: 760px){
+      #toolboxRow{ margin-top:-10px !important; }
+    }
+  </style>
+
+</head>
+
+
+<body>
+
+<header>
+  <h1>Expense Explorer (FY05–FY24)</h1>
+  <div class="sub">
+    <span>Top-level: <b>Primary Government</b> vs <b>Schools</b></span>
+    <span>Overlay labels reserved: <b>Inflation</b>, <b>Inflation + Population</b></span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="panel">
+               <div class="row" style="justify-content:space-between; width:100%">
+      <div class="tabs" id="topGroupTabs"></div>
+
+      <div class="detailLevel" id="detailLevelField">
+        <label class="detailLevelTitle">Detail Level</label>
+        <div class="radioRow" role="radiogroup" aria-label="Detail level">
+
+          <label class="radioPill"><input type="radio" name="detailLevel" value="basic" checked><span>Basic</span></label>
+          <label class="radioPill"><input type="radio" name="detailLevel" value="program"><span>Program</span></label>
+          <label class="radioPill"><input type="radio" name="detailLevel" value="dept"><span>Dept</span></label>
+          <label class="radioPill"><input type="radio" name="detailLevel" value="line"><span>Line</span></label>
+        </div>
+      </div>
+
+            <div class="row">
+                <button id="reloadBtn" class="primary">Reload CSVs</button>
+        <button id="resetBtn">Reset</button>
+        <label class="chip" id="trendToggleWrap" style="cursor:pointer;">
+          <input id="trendToggle" type="checkbox" aria-label="Trend" style="width:16px;height:16px;margin:0;" />
+          <b>Trend</b>
+        </label>
+        <label class="chip" id="inflationToggleWrap" style="cursor:pointer;" title="CPI source: U.S. Bureau of Labor Statistics, CPI-U, all items, U.S. city average, annual averages (2005–2024).">
+          <input id="inflationToggle" type="checkbox" aria-label="Inflation overlay" style="width:16px;height:16px;margin:0;" />
+          <b>Inflation</b>
+        </label>
+        <label class="chip" id="inflationPopToggleWrap" style="cursor:pointer;" title="Inflation + Population uses CPI plus average annual population growth from decennial U.S. Census for Moore County, TN, interpolated between Census years.">
+          <input id="inflationPopToggle" type="checkbox" aria-label="Inflation + Population overlay" style="width:16px;height:16px;margin:0;" />
+          <b>Inflation + Population</b>
+        </label>
+
+      </div>
+    </div>
+
+            <div class="row" id="toolboxRow" style="margin-top:10px">
+            <div id="fundWrap">
+        <label>Fund</label>
+        <select id="fundSelect"></select>
+        <div id="fundWarn" class="small" style="display:none;margin-top:6px;max-width:320px;white-space:normal;overflow-wrap:anywhere;color:var(--danger);line-height:1.25;"></div>
+      </div>
+
+
+ 
+
+
+      <div class="detailWrap" id="programWrap">
+        <label>Program / Function</label>
+        <select id="programSelect"></select>
+      </div>
+
+      <div class="detailWrap" id="deptWrap">
+        <label>Department</label>
+        <select id="deptSelect"></select>
+      </div>
+
+      <div class="detailWrap" id="lineWrap">
+        <label>Line item</label>
+        <select id="lineSelect"></select>
+      </div>
+    </div>
+
+
+
+    <div class="chips" id="stateChips"></div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="chartWrap">
+        <div class="chartHeader">
+          <div>
+            <div class="chartTitle" id="chartTitle">Loading…</div>
+            <div class="chartSubtitle" id="chartSubtitle">Tap a point to see details and open the source PDF.</div>
+          </div>
+          <div class="small" id="chartMeta"></div>
+        </div>
+
+        <svg id="chart" viewBox="0 0 900 360" preserveAspectRatio="none" aria-label="Line chart"></svg>
+
+                <div class="tooltip" id="tooltip">
+          <div class="trow">
+            <div class="muted" id="ttKey">—</div>
+            <div class="val" id="ttVal">—</div>
+          </div>
+
+          <div class="trow">
+            <div class="muted">FY</div>
+            <div class="val" id="ttYear">—</div>
+          </div>
+
+          <div class="trow">
+            <div class="muted">PDF</div>
+            <a class="muted" id="ttPdfLink" href="#" target="_blank" rel="noopener noreferrer" style="pointer-events:none;opacity:.75">—</a>
+          </div>
+
+                    <div class="trow">
+            <div class="muted">Search</div>
+            <div class="muted" id="ttSearch" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;">—</div>
+          </div>
+
+          <div class="trow" id="ttProgramRow" style="display:none;align-items:flex-start">
+            <div class="muted">Program sum</div>
+            <div class="muted" id="ttProgramInfo" style="max-width:240px;white-space:normal;overflow-wrap:anywhere;text-align:right;line-height:1.25;">—</div>
+          </div>
+
+          <div class="trow" id="ttWarnRow" style="display:none">
+
+            <div class="muted">Note</div>
+            <div class="muted" id="ttWarn">—</div>
+          </div>
+
+         
+          <div class="btnrow">
+  <button id="openPdfBtn" class="primary" disabled>Open FY PDF</button>
+  <button id="closeTipBtn">Close</button>
+</div>
+
+      <div class="footerNote">
+        Notes: Missing years are stored as <code>null</code> (gaps), never 0. Program codes 51000–58000 are treated as grouping labels only (non-data).
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="font-weight:700; margin-bottom:6px;">Phase 1 Audit (runtime)</div>
+      <div class="audit" id="auditBox">Loading…</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ===========================
+   DATASET_START_DO_NOT_MODIFY
+   =========================== */
+const dataStore = {
+  years: ["05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24"],
+
+  overlayLabels: {
+    inflation: "Inflation",
+    inflationPlusPopulation: "Inflation + Population"
+  },
+
+  fundRegistry: {
+    "101": { title: "General Fund #101", topGroupsExpected: ["primaryGovernment","schools"], loaded: false },
+    "116": { title: "Solid Waste/Sanitation Fund #116", topGroupsExpected: 
+["primaryGovernment"], loaded: false },
+    "121": { title: "Urban Services Fund #121", topGroupsExpected:
+["primaryGovernment"], loaded: false },
+    "122": { title: "Drug Control Fund #122", topGroupsExpected: ["primaryGovernment"], loaded: false },
+    "131": { title: "Highway/Public Works Fund #131", topGroupsExpected: ["primaryGovernment"], loaded: false },
+    "141": { title: "General Purpose School Fund #141", topGroupsExpected: ["schools"], loaded: false },
+    "142": { title: "School Federal Projects Fund #142", topGroupsExpected: ["schools"], loaded: false },
+    "151": { title: "General Debt Service Fund #151", topGroupsExpected: ["primaryGovernment"], loaded: false },
+    "171": { title: "General Capital Projects Fund #171", topGroupsExpected: ["primaryGovernment"], loaded: false }
+  },
+
+  funds: {}
+};
+/* =========================
+   DATASET_END_DO_NOT_MODIFY
+   ========================= */
+
+const EXCLUDED_ROLLUPS = new Set(["51000","52000","53000","54000","55000","56000","57000","58000"]);
+
+// Fund path resolver (NEW convention)
+//
+// Previously hardcoded paths to search for:
+//   - const url = `./${file}`;            (CSV fetch)
+//   - const PDF_BASE_PATH = "./pdf/";     (PDF prefix)
+//
+// New convention (relative to index.html):
+//   CSV: ./Fund xxx/fundxxx.csv
+//   PDF: ./Fund xxx/fundxxxFYyy.pdf   (yy: "05"..."24")
+function normalizeFySuffix(yy){
+  const s = safeText(yy);
+  if (!s) return null;
+  const m2 = s.match(/(\d{2})$/);
+  return m2 ? m2[1] : null;
+}
+
+function csvPathForFund(fundCode){
+  const fc = safeText(fundCode);
+  if (!fc) return null;
+  return `./Fund ${fc}/fund${fc}.csv`;
+}
+
+function pdfPathForFundYear(fundCode, yy){
+  const fc = safeText(fundCode);
+  const y = normalizeFySuffix(yy);
+  if (!fc || !y) return null;
+  return `./Fund ${fc}/fund${fc}FY${y}.pdf`;
+}
+
+// Optional: if all PDFs live in a subfolder (e.g. ./pdf/FY05.pdf), set this to "./pdf/".
+// CPI + Population macro overlay data
+// CPI source: U.S. Bureau of Labor Statistics, CPI-U, all items, U.S. city average, annual averages (1982-84=100), 2005–2024. 
+// Values are the annual-average CPI for each calendar year.
+const CPI_ANNUAL_AVG = {
+  2005: 195.3,
+  2006: 201.6,
+  2007: 207.3,
+  2008: 215.303,
+  2009: 214.537,
+  2010: 218.056,
+  2011: 224.939,
+  2012: 229.594,
+  2013: 232.957,
+  2014: 236.736,
+  2015: 237.017,
+  2016: 240.007,
+  2017: 245.120,
+  2018: 251.107,
+  2019: 255.657,
+  2020: 258.811,
+  2021: 270.970,
+  2022: 292.655,
+  2023: 304.702,
+  2024: 313.689
+};
+
+// Moore County, TN population anchors (total population):
+// 2000, 2010, 2020 decennial Census; 2024 estimate from Census-based FRED series TNMOOR7POP (thousands × 1,000). 
+const POP_ANCHORS = [
+  { year: 2000, value: 5740 }, // Census 2000 total population
+  { year: 2010, value: 6362 }, // Census 2010
+  { year: 2020, value: 6461 }, // Census 2020
+  { year: 2024, value: 6773 }  // 2024 resident-population estimate (6.773k)
+];
+
+// Interpolate population between anchors using a smooth, constant annual % growth within each segment.
+// This follows the spec: average annual % change between Census years, applied year-by-year within the decade.
+function getPopulationEstimate(year){
+  if (year < POP_ANCHORS[0].year || year > POP_ANCHORS[POP_ANCHORS.length - 1].year) return null;
+
+  let a = null, b = null;
+  for (let i = 0; i < POP_ANCHORS.length - 1; i++){
+    const cur = POP_ANCHORS[i];
+    const next = POP_ANCHORS[i + 1];
+    if (year >= cur.year && year <= next.year){
+      a = cur;
+      b = next;
+      break;
+    }
+  }
+  if (!a || !b) return null;
+
+  const span = b.year - a.year;
+  if (!span) return null;
+
+  // Geometric average annual growth factor so we hit both Census endpoints exactly.
+  const annualFactor = Math.pow(b.value / a.value, 1 / span);
+  const steps = year - a.year;
+  return a.value * Math.pow(annualFactor, steps);
+}
+
+// Build CPI-only and CPI+Population index series (base year = 100) for the provided FY labels.
+// years are two-digit fiscal years (e.g., "05" => 2005).
+function buildMacroOverlays(years, baseYearFull){
+  const baseCpi = CPI_ANNUAL_AVG[baseYearFull];
+  if (!baseCpi) return null;
+
+  const basePop = getPopulationEstimate(baseYearFull);
+
+  const cpiIndex = [];
+  const cpiPopIndex = [];
+
+  for (let i = 0; i < years.length; i++){
+    const yyStr = years[i];
+    const fullYear = 2000 + Number(yyStr);
+    const cpiVal = CPI_ANNUAL_AVG[fullYear];
+
+    if (!cpiVal){
+      cpiIndex.push(null);
+      cpiPopIndex.push(null);
+      continue;
+    }
+
+    // CPI index, normalized so baseYearFull = 100.
+    const cpiIdx = (cpiVal / baseCpi) * 100;
+    cpiIndex.push(cpiIdx);
+
+    if (!basePop){
+      cpiPopIndex.push(null);
+      continue;
+    }
+
+    const popEst = getPopulationEstimate(fullYear);
+    if (!popEst){
+      cpiPopIndex.push(null);
+      continue;
+    }
+
+    // Population index, normalized to 100 at the base year.
+    const popIndex = (popEst / basePop) * 100;
+
+    // Combined Inflation + Population index:
+    // start from CPI index and apply the relative population growth factor for that year.
+    // This yields a reference series that grows with both CPI and local population.
+    cpiPopIndex.push(cpiIdx * (popIndex / 100));
+  }
+
+  return { cpiIndex, cpiPopIndex };
+}
+// Find the *first* continuous run of usage for this series that is at least minLen years long.
+// "Usage" = value is non-null, finite, and > 0 for that fiscal year.
+// We allow up to one "hole" (a single null or 0 year) inside the run, but still require
+// at least minLen non-zero years overall in that run.
+// If no such run exists, return null and we skip trend/overlay drawing for that series entirely.
+function findFirstContinuousUsageRun(valuesObj, years, minLen){
+  let runStartIndex = null;
+  let runLen = 0;        // span length in index steps (includes gaps)
+  let usedCount = 0;     // count of non-zero data years in the run
+  let gapCount = 0;      // count of gaps inside a started run
+  const maxGaps = 1;
+
+  const flushRun = () => {
+    if (runStartIndex == null) return null;
+    // Require at least minLen non-zero years, not just span length.
+    if (usedCount >= minLen){
+      return { startIndex: runStartIndex, length: runLen };
+    }
+    return null;
+  };
+
+  for (let i = 0; i < years.length; i++){
+    const yy = years[i];
+    const v = valuesObj[yy];
+    const isUsed = (v != null && isFinite(v) && v !== 0);
+
+    if (isUsed){
+      if (runStartIndex == null){
+        // Start a new run at the first positive (>0) year.
+        runStartIndex = i;
+        runLen = 1;
+        usedCount = 1;
+        gapCount = 0;
+      } else {
+        runLen++;
+        usedCount++;
+      }
+    } else {
+      // Before any run starts, just skip leading null/0 years.
+      if (runStartIndex == null) continue;
+
+      // Inside a run: permit at most one hole year (null or 0); after that, end the run.
+      if (gapCount < maxGaps){
+        gapCount++;
+        runLen++;
+      } else {
+        const found = flushRun();
+        if (found) return found;
+        runStartIndex = null;
+        runLen = 0;
+        usedCount = 0;
+        gapCount = 0;
+      }
+    }
+  }
+
+  // End-of-array run
+  const tail = flushRun();
+  return tail || null;
+}
+
+
+
+// PDFs now resolve per-fund via pdfPathForFundYear(); keep empty to avoid double-prefixing.
+const PDF_BASE_PATH = "";
+
+// PDF.js viewer (NOT native browser PDF)
+const PDFJS_VIEWER_PATH = "./pdfjs/web/viewer.html";
+// ===== Fund folder + filename conventions (runtime-only, relative paths) =====
+function csvPathForFund(fundCode){
+  const fc = safeText(fundCode).replace(/[^\d]/g, "");
+  if (!fc) return null;
+  return `./Fund ${fc}/fund${fc}.csv`;
+}
+
+function pdfPathForFundYear(fundCode, yy){
+  const fc = safeText(fundCode).replace(/[^\d]/g, "");
+  const y = normalizeFySuffix(yy);
+  if (!fc || !y) return null;
+  return `./Fund ${fc}/fund${fc}FY${y}.pdf`;
+}
+
+
+// Resolve whatever is in the CSV into a safe relative/absolute PDF URL,
+// defaulting to the fund-local convention when blank or legacy FYxx.pdf.
+function resolvePdfFileForFundYear(fundCode, yy, pdfFileRaw){
+  const u = safeText(pdfFileRaw);
+  if (!u) return pdfPathForFundYear(fundCode, yy);
+
+  // Reject Windows absolute paths at runtime (must be served by Live Server)
+  if (/^[a-zA-Z]:\\/.test(u) || u.includes("\\\\")) return null;
+
+  const lower = u.toLowerCase();
+  if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("file://")) return u;
+
+  // Explicit relative or already-foldered: keep
+  if (u.startsWith("/") || u.startsWith("./") || u.includes("/")) return u;
+
+    // Legacy naming like FY05.pdf / FY05 / FY2005.pdf / 2005.pdf -> convert to the fund-local convention
+  if (/^FY\s*\d{2}(?:\.pdf)?$/i.test(u) || /^FY\s*20\d{2}(?:\.pdf)?$/i.test(u) || /^\d{2}(?:\.pdf)?$/.test(u) || /^20\d{2}(?:\.pdf)?$/.test(u)){
+    return pdfPathForFundYear(fundCode, u);
+  }
+
+
+  // Otherwise treat as a filename inside the fund folder
+  const fc = safeText(fundCode).replace(/[^\d]/g, "");
+  if (!fc) return null;
+  return `./Fund ${fc}/${u}`;
+}
+
+function toAbsoluteUrl(u){
+  const s = safeText(u);
+  if (!s) return null;
+  try { return new URL(s, window.location.href).href; }
+  catch(_){ return null; }
+}
+
+// Extract the 5-digit code to search for.
+// If seriesKey is "51100-51210", this returns "51210" (last 5-digit group).
+function extractSearchCode(seriesKey){
+  const s = safeText(seriesKey);
+  const m = s.match(/\d{5}/g);
+  return (m && m.length) ? m[m.length - 1] : null;
+}
+
+function buildPdfJsViewerHref(absPdfUrl, page, searchCode){
+  const abs = safeText(absPdfUrl);
+  if (!abs) return null;
+
+  const fileParam = encodeURIComponent(abs);
+
+  const parts = [];
+  if (page != null && isFinite(page) && page > 0) parts.push(`page=${Math.round(page)}`);
+  if (searchCode){
+    parts.push(`search=${encodeURIComponent(searchCode)}`);
+    parts.push(`phrase=true`);
+  }
+
+  const hash = parts.length ? ("#" + parts.join("&")) : "";
+  return `${PDFJS_VIEWER_PATH}?file=${fileParam}${hash}`;
+}
+
+
+const TOP_GROUPS = {
+  primaryGovernment: { label: "Primary Government" },
+  schools: { label: "Schools" }
+};
+
+const state = {
+  topGroup: "primaryGovernment",
+  fundId: null,
+  programCode: null,
+  deptCode: null,
+  lineKey: null,
+  detailLevel: "basic", // basic | program | dept | line
+  showTrend: false, // UI toggle; draw regression trend line when true
+  // New overlays: CPI-only and CPI + Population (Moore County, TN)
+  showInflation: false,
+  showInflationPlusPopulation: false,
+  tip: null
+};
+
+
+
+
+function $(id){ return document.getElementById(id); }
+// ===== Detail level (radio) logic: keeps toolbox small by default =====
+function getSelectedDetailLevel(){
+  const el = document.querySelector('input[name="detailLevel"]:checked');
+  return el ? el.value : "basic";
+}
+
+function applyDetailLevelVisibility(){
+  const level = state.detailLevel || "basic";
+
+  const pw = $("programWrap");
+  const dw = $("deptWrap");
+  const lw = $("lineWrap");
+
+  const ps = $("programSelect");
+  const ds = $("deptSelect");
+  const ls = $("lineSelect");
+
+  const showProgram = (level !== "basic");
+  const showDept = (level === "dept" || level === "line");
+  const showLine = (level === "line");
+
+    // NOTE: .detailWrap defaults to display:none in CSS, so we must set an explicit
+  // visible display value here ("" would still be hidden by the CSS rule).
+  if (pw) pw.style.display = showProgram ? "block" : "none";
+  if (dw) dw.style.display = showDept ? "block" : "none";
+  if (lw) lw.style.display = showLine ? "block" : "none";
+
+
+  if (ps) ps.disabled = !showProgram;
+  if (ds) ds.disabled = !showDept;
+  if (ls) ls.disabled = !showLine;
+
+  // pill highlighting (if you used the .radioPill labels)
+  document.querySelectorAll('input[name="detailLevel"]').forEach(inp => {
+    const lab = inp.closest("label");
+    if (lab) lab.classList.toggle("active", inp.checked);
+  });
+
+  recalcChartHeight();
+}
+
+function setDetailLevel(level){
+  level = level || "basic";
+  state.detailLevel = level;
+
+  // When backing out, clear deeper selections so the UI stays “clean”
+  if (level === "basic"){
+    state.programCode = null;
+    state.deptCode = null;
+    state.lineKey = null;
+  } else if (level === "program"){
+    state.deptCode = null;
+    state.lineKey = null;
+  } else if (level === "dept"){
+    state.lineKey = null;
+  }
+
+  hideTooltip();
+  refreshUI();                // repopulates selects and chart
+  applyDetailLevelVisibility();
+}
+
+function setupDetailLevelRadios(){
+  // If radios aren’t present (older layout), do nothing
+  const radios = Array.from(document.querySelectorAll('input[name="detailLevel"]'));
+  if (!radios.length) return;
+
+  // Initialize from checked radio
+  state.detailLevel = getSelectedDetailLevel();
+
+  radios.forEach(r => {
+    r.addEventListener("change", () => setDetailLevel(r.value), { passive:true });
+  });
+
+  applyDetailLevelVisibility();
+
+  // Resize/rotate support
+  window.addEventListener("resize", () => requestAnimationFrame(recalcChartHeight), { passive:true });
+  if (window.visualViewport){
+    window.visualViewport.addEventListener("resize", () => requestAnimationFrame(recalcChartHeight), { passive:true });
+  }
+
+  requestAnimationFrame(recalcChartHeight);
+  setTimeout(recalcChartHeight, 200);
+}
+
+// Keeps chart as large as possible; shrinks when toolbox grows
+function recalcChartHeight(){
+  const vv = window.visualViewport;
+  const vh = vv ? vv.height : window.innerHeight;
+
+  const wrap = document.querySelector(".chartWrap");
+  const header = document.querySelector(".chartHeader");
+  const chart = $("chart");
+  if (!wrap || !chart) return;
+
+  const top = wrap.getBoundingClientRect().top;
+  const headerH = header ? header.getBoundingClientRect().height : 0;
+
+  let h = vh - top - headerH - 16;
+  h = Math.max(260, Math.min(h, 680));
+
+  // Works whether you used CSS var(--chartH) or not:
+  document.documentElement.style.setProperty("--chartH", Math.round(h) + "px");
+  chart.style.height = Math.round(h) + "px";
+}
+
+// --- Filter toggles + auto chart height (keeps chart big, shrinks when toolbox grows) ---
+function setToggleOpen(fieldEl, open){
+  if (!fieldEl) return;
+  fieldEl.classList.toggle("open", !!open);
+  const btn = fieldEl.querySelector(".toggleBtn");
+  const caret = btn ? btn.querySelector(".caret") : null;
+  if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+  if (caret) caret.textContent = open ? "▾" : "▸";
+}
+
+function recalcChartHeight(){
+  const root = document.documentElement;
+  const vv = window.visualViewport;
+  const vh = vv ? vv.height : window.innerHeight;
+
+  const chartWrap = document.querySelector(".chartWrap");
+  if (!chartWrap) return;
+
+  const top = chartWrap.getBoundingClientRect().top;
+  const header = chartWrap.querySelector(".chartHeader");
+  const headerH = header ? header.getBoundingClientRect().height : 0;
+
+  // Remaining viewport space below the chart header, with a little bottom breathing room
+  let h = vh - top - headerH - 16;
+
+  // Clamp so it stays usable on tiny screens and doesn’t get absurd on huge screens
+  h = Math.max(260, Math.min(h, 640));
+
+  root.style.setProperty("--chartH", Math.round(h) + "px");
+}
+
+function setupFilterToggles(){
+  const cfg = [
+    {
+      field: $("programField"),
+      btn: $("programToggle"),
+      sel: $("programSelect"),
+      clear: () => { state.programCode=null; state.deptCode=null; state.lineKey=null; }
+    },
+    {
+      field: $("deptField"),
+      btn: $("deptToggle"),
+      sel: $("deptSelect"),
+      clear: () => { state.deptCode=null; state.lineKey=null; }
+    },
+    {
+      field: $("lineField"),
+      btn: $("lineToggle"),
+      sel: $("lineSelect"),
+      clear: () => { state.lineKey=null; }
+    }
+  ];
+
+  cfg.forEach(({field, btn, sel, clear}) => {
+    if (!field || !btn || !sel) return;
+
+    // default OFF (closed)
+    setToggleOpen(field, false);
+
+    btn.onclick = () => {
+      const open = !field.classList.contains("open");
+      setToggleOpen(field, open);
+
+      // Turning OFF = disable that filter level (and deeper) by clearing state
+      if (!open){
+        clear();
+        try{ sel.value = ""; }catch(_){}
+        hideTooltip();
+        refreshUI();
+      }
+
+      requestAnimationFrame(recalcChartHeight);
+    };
+  });
+
+  // Recalc on resize/orientation changes
+  window.addEventListener("resize", () => requestAnimationFrame(recalcChartHeight), { passive:true });
+  if (window.visualViewport){
+    window.visualViewport.addEventListener("resize", () => requestAnimationFrame(recalcChartHeight), { passive:true });
+  }
+
+  // Recalc when the toolbox content changes size (chips, dropdowns, etc.)
+  if (window.ResizeObserver){
+    const ro = new ResizeObserver(() => requestAnimationFrame(recalcChartHeight));
+    const toolboxPanel = document.querySelector(".wrap > .panel");
+    const chartHeader = document.querySelector(".chartHeader");
+    if (toolboxPanel) ro.observe(toolboxPanel);
+    if (chartHeader) ro.observe(chartHeader);
+  }
+
+  // Initial sizing pass (and a second pass after layout settles)
+  requestAnimationFrame(recalcChartHeight);
+  setTimeout(recalcChartHeight, 200);
+}
+
+// Run alongside your existing init()
+document.addEventListener("DOMContentLoaded", setupFilterToggles);
+
+function formatMoney(x){
+  if (x == null || !isFinite(x)) return "—";
+  const sign = x < 0 ? "-" : "";
+  const v = Math.abs(x);
+  return sign + "$" + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatAxisMoney(x){
+  if (x == null || !isFinite(x)) return "—";
+  const sign = x < 0 ? "-" : "";
+  const v = Math.abs(x);
+  const hasFrac = Math.abs(v - Math.round(v)) > 1e-9;
+  const opts = (v >= 1000 || !hasFrac)
+    ? { maximumFractionDigits: 0 }
+    : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+  return sign + "$" + v.toLocaleString(undefined, opts);
+}
+
+
+// Prefer raw CSV text when possible (it should match the PDF table formatting best).
+// Removes letters/symbols, keeps digits and common numeric punctuation used in PDFs.
+function normalizePdfNumber(raw){
+  const s = safeText(raw);
+  if (!s) return null;
+  let t = s.replace(/\$/g, "").replace(/\s+/g, "");
+  t = t.replace(/[^\d\(\)\-\,\.]/g, ""); // strip letters and other junk
+  return t || null;
+}
+
+// Fallback if we don't have the raw CSV string for this point.
+function formatPdfSearchNumber(x){
+  if (x == null || !isFinite(x)) return null;
+  const v = Math.abs(x).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (x < 0) ? `(${v})` : v; // parentheses style for negatives
+}
+
+
+function yearLabel(yy){ return "FY" + yy; }
+/* ===== PDF open hardening (iOS Safari / Android Chrome) ===== */
+function isSafePdfUrl(url){
+  const s = safeText(url);
+  if (!s) return false;
+  const lower = s.toLowerCase();
+  if (lower.startsWith("javascript:") || lower.startsWith("data:") || lower.startsWith("vbscript:")) return false;
+  // Best-effort: ensure it's a PDF-ish path (allow query/fragment)
+  if (!/\.pdf(\?|#|$)/i.test(s)) return false;
+  return true;
+}
+
+function applyPdfBasePath(rawUrl){
+  const u = safeText(rawUrl);
+  if (!u) return null;
+
+  const lower = u.toLowerCase();
+  // Absolute / explicit relative paths: leave as-is
+  if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("file://")) return u;
+  if (u.startsWith("/") || u.startsWith("./") || u.startsWith("../")) return u;
+
+  // If CSV already includes a folder path, leave as-is
+  if (u.includes("/")) return u;
+
+  // Otherwise, optionally prefix a base folder
+  let base = safeText(PDF_BASE_PATH);
+  if (!base) return u;
+
+  if (!base.endsWith("/")) base += "/";
+  if (!base.startsWith("./") && !base.startsWith("../") && !base.startsWith("/")) base = "./" + base;
+
+  return base + u;
+}
+
+const pdfExistsCache = new Map();
+
+async function checkPdfExists(urlRaw){
+  const u = safeText(urlRaw);
+  if (!u) return false;
+  const reqUrl = encodeURI(u);
+  try{
+    const r = await fetch(reqUrl, { method:"HEAD", cache:"no-store" });
+    if (r.ok) return true;
+
+    // Some static servers don’t support HEAD; fall back to a tiny GET.
+    if (r.status === 405 || r.status === 501){
+      const r2 = await fetch(reqUrl, { method:"GET", headers:{ "Range":"bytes=0-0" }, cache:"no-store" });
+      return r2.ok;
+    }
+    return false;
+  }catch(_e){
+    try{
+      const r2 = await fetch(reqUrl, { method:"GET", headers:{ "Range":"bytes=0-0" }, cache:"no-store" });
+      return r2.ok;
+    }catch(_e2){
+      return false;
+    }
+  }
+}
+
+function buildPdfHref(fund, seriesKey, yy, searchToken){
+  const pdf = fund?.pdfByYear?.[yy] || { url:null, defaultPage:null };
+  const fundId = fund?.fundId ?? state.fundId ?? null;
+
+  // NEW convention: compute per-fund/per-year path at runtime (don’t rely on CSV pdf.url)
+  const resolved = (fundId && yy) ? pdfPathForFundYear(fundId, yy) : null;
+  const rawUrl = resolved || pdf.url;
+
+  const urlRaw = applyPdfBasePath(rawUrl);
+  if (!isSafePdfUrl(urlRaw)) return { url:null, urlRaw:null, page:null, href:null, nativeHref:null, display:null };
+
+  const pageRaw = fund?.pageByPoint?.[`${seriesKey}|${yy}`] ?? pdf.defaultPage ?? null;
+  const page = (pageRaw != null && isFinite(pageRaw) && pageRaw > 0) ? Math.round(pageRaw) : null;
+
+  const url = encodeURI(urlRaw); // handle spaces safely
+  const nativeHref = page != null ? `${url}#page=${page}` : url;
+
+    // PDF.js viewer (NOT native browser PDF)
+  // Pass #search as a fallback (popup-blocked / no window handle). When smart-highlight runs, it clears PDF.js yellow highlights and applies a single green cell highlight.
+  const abs = toAbsoluteUrl(urlRaw);
+  const viewerHref = buildPdfJsViewerHref(abs, page, safeText(searchToken) || null);
+
+
+  // Prefer viewer; fallback to native if PDF.js isn't available
+  const href = viewerHref || nativeHref;
+
+  // Friendly display name (don’t show leading "./")
+  const display = urlRaw.replace(/^\.\//,"");
+
+  return { url, urlRaw, page, href, nativeHref, display };
+}
+
+
+
+
+// Open only from a direct user click; avoid async; fall back if popup/new-tab is blocked.
+function openPdfUserGesture(href){
+  if (!href) return { opened:false, method:"none" };
+
+  // 1) Try window.open first so we can detect popup blocking (null return).
+  try{
+    const w = window.open(href, "_blank");
+        if (w){
+      try{ w.opener = null; }catch(_e){}
+      return { opened:true, method:"window", win:w };
+    }
+
+  }catch(_e){}
+
+  // 2) Try an actual <a target="_blank"> click (often better on iOS Safari).
+  try{
+    const a = document.createElement("a");
+    a.href = href;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.style.position = "fixed";
+    a.style.left = "-9999px";
+    a.style.top = "0";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return { opened:true, method:"anchor" };
+  }catch(_e){}
+
+  // 3) Same-tab fallback (still user-initiated, avoids “nothing happens”).
+  try{
+    window.location.href = href;
+    return { opened:true, method:"same-tab" };
+  }catch(_e){}
+
+    return { opened:false, method:"failed" };
+}
+// ===== PDF.js Smart Highlight (anchor left column -> highlight ONE YTD cell) =====
+
+function buildPdfSmartLocator(fund, seriesKey){
+  const s = safeText(seriesKey);
+  const fundId = fund?.fundId ?? null;
+
+  // Fund total series
+  if (fund && s && s === fund.fundTotalKey){
+    return { kind:"fund", fundId };
+  }
+
+  // Line item seriesKey is "#####-###"
+  const m = s.match(/^(\d{5})-(\d{3})$/);
+  if (m){
+    return { kind:"line", fundId, deptCode:m[1], lineCode:m[2] };
+  }
+
+  // Department seriesKey is "#####"
+  if (/^\d{5}$/.test(s)){
+    return { kind:"dept", fundId, deptCode:s };
+  }
+
+  return { kind:"unknown", fundId, seriesKey:s };
+}
+
+function formatPdfSmartLocator(loc){
+  if (!loc) return "—";
+  if (loc.kind === "line") return `Dept ${loc.deptCode} • Line ${loc.lineCode} • YTD cell`;
+  if (loc.kind === "dept") return `Total ${loc.deptCode} • YTD cell`;
+  if (loc.kind === "fund") return `Total For Fund ${loc.fundId} • YTD cell`;
+  return `Anchor ${safeText(loc.seriesKey) || "—"} • YTD cell`;
+}
+
+function isMoneyLikeToken(t){
+  const s = safeText(t);
+  if (!s) return false;
+  if (/%/.test(s)) return false;
+  // Require decimals so we don't accidentally pick the 3-digit/5-digit codes
+  return /^[\(\-]?\d[\d,]*\.\d{2}\)?$/.test(s);
+}
+
+function clearPdfjsHighlights(doc){
+  if (!doc) return;
+
+  // Clear our own highlight
+  doc.querySelectorAll('[data-smart-hl="1"]').forEach(el => {
+    try{
+      el.removeAttribute("data-smart-hl");
+      el.style.backgroundColor = "";
+      el.style.borderRadius = "";
+      el.style.boxShadow = "";
+    }catch(_e){}
+  });
+
+  // Also clear PDF.js find highlights (if any exist for any reason)
+  doc.querySelectorAll(".textLayer .highlight, .textLayer .highlight.selected").forEach(el => {
+    try{
+      el.classList.remove("highlight","selected","begin","end","middle");
+    }catch(_e){}
+  });
+}
+
+function smartHighlightPdfjs(win, { page, locator, ytdToken=null, onWarn=null }){
+  const start = Date.now();
+  const TIMEOUT = 12000;
+
+  const warn = (msg) => {
+    try{ if (typeof onWarn === "function") onWarn(msg); }catch(_e){}
+  };
+
+  const tick = () => {
+    if (!win || win.closed) return warn("PDF window closed before auto-highlight finished.");
+    if ((Date.now() - start) > TIMEOUT) return warn("Auto-highlight timed out (PDF.js viewer not ready).");
+
+    let app = null;
+    try{ app = win.PDFViewerApplication; }catch(_e){}
+
+    if (!app || !app.initialized || !app.pdfViewer || !app.pdfDocument){
+      setTimeout(tick, 80);
+      return;
+    }
+
+    // Go to the correct page (CSV page number)
+    try{
+      if (page && app.pdfViewer.currentPageNumber !== page){
+        app.pdfLinkService.goToPage(page);
+      }
+    }catch(_e){}
+
+    // Force-clear find query/highlights
+    try{
+      if (app.findController){
+        app.findController.executeCommand("find", {
+          query: "",
+          phraseSearch: true,
+          highlightAll: false,
+          caseSensitive: false
+        });
+      }
+    }catch(_e){}
+
+    const pageEl = win.document.querySelector(`.page[data-page-number="${page}"]`);
+    const textLayer = pageEl && pageEl.querySelector(".textLayer");
+    const spans = textLayer && textLayer.querySelectorAll("span");
+
+    // Wait for text layer to render (poll)
+    if (!pageEl || !textLayer || !spans || spans.length < 8){
+      try{ app.pdfViewer.scrollPageIntoView({ pageNumber: page }); }catch(_e){}
+      setTimeout(tick, 100);
+      return;
+    }
+
+    clearPdfjsHighlights(win.document);
+
+    const ok = smartHighlightOnPdfPage(win, pageEl, locator, ytdToken);
+    if (!ok){
+      warn("Couldn’t locate the correct row/YTD cell on this page (OCR/text layout mismatch or page mapping issue).");
+    }
+  };
+
+  tick();
+}
+
+function smartHighlightOnPdfPage(win, pageEl, locator, ytdToken){
+  const pageRect = pageEl.getBoundingClientRect();
+
+  const spans = Array.from(pageEl.querySelectorAll(".textLayer span"))
+    .filter(s => safeText(s.textContent));
+
+  if (!spans.length) return false;
+
+  const items = spans.map(s => {
+    const r = s.getBoundingClientRect();
+    return {
+      s,
+      text: s.textContent,
+      x: (r.left + r.right) / 2,
+      y: (r.top + r.bottom) / 2
+    };
+  }).sort((a,b) => a.y - b.y || a.x - b.x);
+
+  // Find approximate X center of the "Year-to-Date" column header
+  let ytdX = null;
+  for (const it of items){
+    if (/Year-to-Date/i.test(it.text)){
+      ytdX = it.x;
+      break;
+    }
+  }
+  if (ytdX == null){
+    // Template fallback: YTD is typically mid-right
+    ytdX = pageRect.left + pageRect.width * 0.63;
+  }
+
+  // Group spans into lines using y proximity
+  const lines = [];
+  const tol = 2.8;
+
+  for (const it of items){
+    let ln = lines[lines.length - 1];
+    if (!ln || Math.abs(it.y - ln.y) > tol){
+      ln = { y: it.y, items: [] };
+      lines.push(ln);
+    }
+    ln.items.push(it);
+    ln.y = (ln.y * (ln.items.length - 1) + it.y) / ln.items.length;
+  }
+
+  for (const ln of lines){
+    ln.items.sort((a,b) => a.x - b.x);
+    ln.text = ln.items.map(it => safeText(it.text)).filter(Boolean).join(" ").replace(/\s+/g," ").trim();
+  }
+
+  const findLineIndex = (pred) => {
+    for (let i=0;i<lines.length;i++){
+      if (pred(lines[i])) return i;
+    }
+    return -1;
+  };
+
+  let targetIdx = -1;
+
+  if (locator?.kind === "fund" && locator.fundId != null){
+    const reFund = new RegExp(`\\b${String(locator.fundId).replace(/[^\d]/g,"")}\\b`);
+    targetIdx = findLineIndex(ln => /Total\s+For\s+Fund/i.test(ln.text) && reFund.test(ln.text));
+    if (targetIdx === -1){
+      targetIdx = findLineIndex(ln => /Fund\/?SF/i.test(ln.text) && reFund.test(ln.text) && /Total/i.test(ln.text));
+    }
+  } else if (locator?.kind === "dept" && locator.deptCode){
+    const reDept = new RegExp(`\\b${locator.deptCode}\\b`);
+    targetIdx = findLineIndex(ln => /^Total\b/i.test(ln.text) && reDept.test(ln.text));
+  } else if (locator?.kind === "line" && locator.deptCode && locator.lineCode){
+    const reDeptHeader = new RegExp(`^${locator.deptCode}\\b`);
+    let deptStart = findLineIndex(ln => reDeptHeader.test(ln.text));
+    if (deptStart === -1){
+      const reDeptAny = new RegExp(`\\b${locator.deptCode}\\b`);
+      deptStart = findLineIndex(ln => reDeptAny.test(ln.text));
+    }
+
+    let deptEnd = lines.length;
+    if (deptStart !== -1){
+      for (let i=deptStart+1;i<lines.length;i++){
+        if (/^\d{5}\b/.test(lines[i].text)){
+          deptEnd = i;
+          break;
+        }
+      }
+    }
+
+    const reLine = new RegExp(`^${locator.lineCode}\\b`);
+    if (deptStart !== -1){
+      for (let i=deptStart+1;i<deptEnd;i++){
+        if (reLine.test(lines[i].text)){
+          targetIdx = i;
+          break;
+        }
+      }
+    } else {
+      targetIdx = findLineIndex(ln => reLine.test(ln.text));
+    }
+  }
+
+  if (targetIdx === -1) return false;
+
+  const ln = lines[targetIdx];
+
+  const moneyItems = ln.items.filter(it => isMoneyLikeToken(it.text));
+  if (!moneyItems.length) return false;
+
+  // Prefer exact YTD token match ONLY as a verifier within the anchored row (never as a global search)
+  let chosen = null;
+  const tok = safeText(ytdToken);
+
+  if (tok && tok !== "0.00"){
+    const matches = moneyItems.filter(it => normalizePdfNumber(it.text) === tok);
+    if (matches.length === 1) chosen = matches[0];
+  }
+
+  if (!chosen){
+    // Choose the money token closest to the YTD column header X
+    let best = null;
+    let bestD = Infinity;
+    for (const it of moneyItems){
+      const d = Math.abs(it.x - ytdX);
+      if (d < bestD){
+        bestD = d;
+        best = it;
+      }
+    }
+    chosen = best;
+  }
+
+  if (!chosen) return false;
+
+  const el = chosen.s;
+  el.setAttribute("data-smart-hl","1");
+
+  // Single green highlight (no yellow)
+  el.style.backgroundColor = "rgba(0, 200, 83, 0.35)";
+  el.style.borderRadius = "3px";
+  el.style.boxShadow = "0 0 0 2px rgba(0, 200, 83, 0.35)";
+
+    // Center it vertically when possible; but on first/last page show the whole page instead.
+  try{
+    const app2 = win.PDFViewerApplication;
+    const numPages = (app2 && app2.pdfDocument) ? app2.pdfDocument.numPages : null;
+    const isEdgePage = (page === 1) || (numPages && page === numPages);
+
+    if (isEdgePage){
+      try{ if (app2 && app2.pdfViewer) app2.pdfViewer.currentScaleValue = "page-fit"; }catch(_e){}
+      try{ if (app2 && app2.pdfViewer) app2.pdfViewer.scrollPageIntoView({ pageNumber: page }); }catch(_e){}
+    } else {
+      el.scrollIntoView({ block:"center", inline:"nearest", behavior:"smooth" });
+    }
+  }catch(_e){
+    try{ el.scrollIntoView({ block:"center", inline:"nearest" }); }catch(__){
+      try{ el.scrollIntoView(true); }catch(__2){}
+    }
+  }
+
+
+  return true;
+}
+
+function copyTextToClipboard(text){
+  const t = safeText(text);
+  if (!t) return Promise.resolve(false);
+
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    return navigator.clipboard.writeText(t)
+      .then(()=>true)
+      .catch(()=>fallbackCopyText(t));
+  }
+  return Promise.resolve(fallbackCopyText(t));
+}
+
+function fallbackCopyText(t){
+  try{
+    const ta = document.createElement("textarea");
+    ta.value = t;
+    ta.setAttribute("readonly","");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    ta.style.top = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return !!ok;
+  }catch(_){
+    return false;
+  }
+}
+
+function isLikelyIOSWebKit(){
+  const ua = navigator.userAgent || "";
+  const iOS = /iPad|iPhone|iPod/.test(ua);
+  const iPadOS = (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  return iOS || iPadOS;
+}
+
+function isSafariDesktop(){
+  const ua = navigator.userAgent || "";
+  return /Safari/.test(ua) && !/Chrome|CriOS|FxiOS|Edg|OPR/.test(ua);
+}
+
+function shouldShowPageJumpHint(){
+  // iOS browsers are all WebKit; PDF viewers often ignore #page fragments
+  return isLikelyIOSWebKit() || isSafariDesktop();
+}
+
+function safeText(s){ return (s == null ? "" : String(s)).trim(); }
+
+function parseYearToYY(raw){
+  const s = safeText(raw);
+  if (!s) return null;
+  // Handles FY05, FY2005, 2005, 05
+  const m = s.match(/(\d{2,4})/);
+  if (!m) return null;
+  let n = m[1];
+  if (n.length === 4) n = n.slice(2);
+  if (n.length === 2) return n.padStart(2,"0");
+  return null;
+}
+
+function parseNumber(raw){
+  const s0 = safeText(raw);
+  if (!s0) return null;
+
+  // Handle "$1,234.56", "(1,234.56)", "-1,234.56"
+  let s = s0.replace(/\$/g,"").replace(/,/g,"").trim();
+  const isParenNeg = /^\(.*\)$/.test(s);
+  if (isParenNeg) s = s.slice(1, -1);
+
+    const v = Number(s);
+  if (!isFinite(v)) return null;
+  return isParenNeg ? -v : v;
+}
+
+function parsePdfPageInt(raw){
+  const s0 = safeText(raw);
+  if (!s0) return null;
+
+  // Fast path: plain numeric page (e.g., "12", "12.0")
+  const n = Number(s0.replace(/,/g,""));
+  if (isFinite(n) && n > 0) return Math.round(n);
+
+  // Fallback: extract first integer from strings like "12-13", "pg 12", "12 / 13"
+  const m = s0.match(/(\d{1,5})/);
+  if (!m) return null;
+  const v = Number(m[1]);
+  if (!isFinite(v) || v <= 0) return null;
+  return Math.round(v);
+}
+
+
+
+function splitCodeLabel(raw){
+  const s = safeText(raw);
+  if (!s) return { code:null, label:null };
+  const idx = s.indexOf(" - ");
+  if (idx === -1) return { code: s, label: s };
+  return { code: s.slice(0, idx).trim(), label: s.slice(idx+3).trim() };
+}
+
+// CSV parser (handles quotes and commas)
+function parseCSV(text){
+  // Normalize BOM + tolerate TSV/semicolon exports (keeps Fund 101 working).
+  if (text == null) text = "";
+  text = String(text);
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+
+  // Heuristic delimiter detection from the first few lines
+  const head = text.split(/\r?\n/).slice(0, 5).join("\n");
+  const commaCount = (head.match(/,/g) || []).length;
+  const tabCount = (head.match(/\t/g) || []).length;
+  const semiCount = (head.match(/;/g) || []).length;
+
+  // Only rewrite when commas are basically absent and one alternative dominates
+  if (commaCount < 3 && tabCount > 8 && tabCount > semiCount){
+    text = text.replace(/\t/g, ",");
+  } else if (commaCount < 3 && semiCount > 8 && semiCount > tabCount){
+    text = text.replace(/;/g, ",");
+  }
+
+  const rows = [];
+  let i=0, field="", row=[], inQuotes=false;
+  while(i < text.length){
+    const c = text[i];
+
+    if (inQuotes){
+      if (c === '"'){
+        const next = text[i+1];
+        if (next === '"'){ field += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      } else { field += c; i++; continue; }
+    } else {
+      if (c === '"'){ inQuotes = true; i++; continue; }
+      if (c === ','){ row.push(field); field=""; i++; continue; }
+      if (c === '\n'){
+        row.push(field); field="";
+        // handle CRLF
+        if (row.length === 1 && row[0] === "" && rows.length === 0){ row=[]; i++; continue; }
+        rows.push(row);
+        row=[]; i++; continue;
+      }
+      if (c === '\r'){ i++; continue; }
+      field += c; i++; continue;
+    }
+  }
+  // last row
+  if (field.length || row.length){
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function detectHeaderRow(rows){
+  // Title-row rule: first row may be single-cell title; if so, header is next row.
+  if (rows.length < 2) return 0;
+  const r0 = rows[0].map(safeText).filter(Boolean);
+  const r1 = rows[1].map(safeText).filter(Boolean);
+  const r0LooksTitle = (r0.length === 1 && r1.length >= 5);
+  const r1HasFiscal = r1.join(" ").toLowerCase().includes("fiscal year");
+  if (r0LooksTitle && r1HasFiscal) return 1;
+  return 0;
+}
+
+function detectWideOrLong(headers){
+  const h = headers.map(s => safeText(s).toLowerCase());
+  const hasFiscalYear = h.includes("fiscal year") || h.some(x => x.includes("fiscal year"));
+  const hasAmount = h.includes("year-to-date expenditures") || h.some(x => x.includes("expenditures"));
+  const hasFYCols = headers.some(x => /^(FY)?\s?\d{2}$/.test(safeText(x))) ||
+                   headers.some(x => /^FY\d{2}$/.test(safeText(x))) ||
+                   headers.some(x => /^FY20\d{2}$/.test(safeText(x)));
+  if (hasFYCols && !hasFiscalYear) return "wide";
+  if (hasFiscalYear && hasAmount) return "long";
+  // best-effort
+  return hasFYCols ? "wide" : "long";
+}
+
+function ensureYearMap(){
+  const obj = {};
+  for (const y of dataStore.years) obj[y] = null;
+  return obj;
+}
+
+function addAlias(meta, key, label, yearYY){
+  if (!meta[key]) meta[key] = { label: label || key, aliases: [], _seen: [] };
+  if (!meta[key]._seen) meta[key]._seen = []; // <-- FIX: ensure history array exists
+  const s = safeText(label || key);
+  if (!s) return;
+  meta[key]._seen.push({ yy: yearYY, label: s });
+}
+
+function finalizeMeta(meta){
+  for (const k of Object.keys(meta)){
+    const seen = meta[k]._seen || [];
+    if (!seen.length){
+      delete meta[k]._seen;
+      continue;
+    }
+    // canonical label = label in latest non-null year (max yy)
+    const latest = seen.slice().sort((a,b)=>a.yy.localeCompare(b.yy)).pop();
+    const canonical = latest.label;
+    const aliases = Array.from(new Set(seen.map(x=>x.label).filter(x=>x !== canonical)));
+    meta[k].label = canonical;
+    meta[k].aliases = aliases;
+    delete meta[k]._seen;
+  }
+}
+
+function buildFundDatasetFromCSV(fundId, fundTitle, csvText){
+  const rows = parseCSV(csvText);
+  const headerIdx = detectHeaderRow(rows);
+  const headers = (rows[headerIdx] || []).map(safeText);
+  const body = rows.slice(headerIdx+1).filter(r => r.some(c => safeText(c).length));
+
+    const schemaType = detectWideOrLong(headers);
+  const isWide = (schemaType === "wide");
+
+  // In wide exports, identify the FY amount columns (NOT page/pdf/file helper columns).
+  // Must exist (as []) in long exports so later wide guards cannot throw.
+  const wideYearHeaders = (() => {
+    if (!isWide) return [];
+    const yearCandidates = headers.filter(h => {
+      const hs = safeText(h);
+      const yy = parseYearToYY(hs);
+      if (!yy || !dataStore.years.includes(yy)) return false;
+      // Reject page/pdf/file helper columns; those are mapped separately.
+      if (/(pdf\s*page|pdf\b.*page|pdf\s*file|source\s*pdf|\bpage\b|\bpg\b)/i.test(hs)) return false;
+      return true;
+    });
+
+    // Prefer “pure” FY headers if present (FY13, 13, FY2013, 2013, etc.).
+    const strict = yearCandidates.filter(h => {
+      const t = safeText(h).replace(/\s+/g, "").toUpperCase();
+      return /^(FY)?\d{2}$/.test(t) || /^(FY)?20\d{2}$/.test(t);
+    });
+
+    return (strict.length ? strict : yearCandidates);
+  })();
+
+
+  // Map header -> index
+  const idx = {};
+  headers.forEach((h,i)=>{ idx[h] = i; });
+
+  const get = (row, name) => row[idx[name]];
+
+    // Best-effort column picks (expanded beyond Fund 101 header variants)
+  const col = {
+    program: headers.find(h => /(functions\/programs|function\/program|functions?\b|programs?\b)/i.test(h)) || "Functions/Programs",
+    fiscalYear: headers.find(h => /(fiscal\s*year|fiscalyear|\bfy\b|\bfy\d{2,4}\b)/i.test(h)) || "Fiscal Year",
+    deptCode: headers.find(h => /(department\s*code|dept\s*code|deptcode)/i.test(h)) || "Department Code",
+    deptLabel: headers.find(h => /(department\s*(description|desc)|dept\s*(description|desc))/i.test(h)) || "Department Description",
+    lineCode: headers.find(h => /(line\s*item\s*code|lineitemcode|line\s*code)/i.test(h)) || "Line Item Code",
+    lineLabel: headers.find(h => /(line\s*item\s*(description|desc)|lineitem\s*(description|desc)|line\s*(description|desc))/i.test(h)) || "Line Item Description",
+    amount: headers.find(h => /((year[-\s]*to[-\s]*date|ytd).*(expend|amount))|\bexpenditures?\b|\bamount\b/i.test(h)) || "Year-to-Date Expenditures",
+    deptTotal: headers.find(h => /(department\s*total|dept\s*total|department\s*subtotal|dept\s*subtotal|subtotal)/i.test(h)) || "Department Total",
+        pdfFile: headers.find(h => /(pdf\s*file|pdf\b.*file|source\s*pdf)/i.test(h)) || "PDF file",
+    // Accept more header variants ("PDF page", "Page", "Pg", "Page #", "Page No", etc.)
+    pdfPage: headers.find(h => /(pdf\s*page|pdf\b.*page|source\s*page|\bpage\b|\bpg\b|page\s*#|page\s*no\.?)/i.test(h)) || "PDF page"
+
+  };
+
+
+  const uncertainties = [];
+  if (headerIdx === 1) uncertainties.push("Detected a single-cell title row; used the second row as the real header.");
+  else uncertainties.push("No title row detected; treated first row as header based on column names.");
+  uncertainties.push(`Detected CSV shape as '${schemaType}' based on headers (Fiscal Year + Amount => long).`);
+
+  // Top-group mapping: by fundId expectation
+  const topGroupDefault = (dataStore.fundRegistry[fundId]?.topGroupsExpected || []).includes("schools") &&
+                          !(dataStore.fundRegistry[fundId]?.topGroupsExpected || []).includes("primaryGovernment")
+                          ? "schools"
+                          : "primaryGovernment";
+  uncertainties.push(`Mapped fund ${fundId} to topGroup '${topGroupDefault}' by registry expectation (override in later CSVs if you add an explicit field).`);
+
+  const fundTotalKey = `Fund ${fundId} Total`;
+
+  const fundDataset = {
+    fundId,
+    fundTitle,
+    fundTotalKey,
+
+    accountMeta: {},
+    series: {},
+
+    hierarchy: {
+      topGroups: {
+        primaryGovernment: { label: "Primary Government", programs: [] },
+        schools: { label: "Schools", programs: [] }
+      },
+      programs: {},
+      departments: {},
+      lineItems: {}
+    },
+
+        pdfByYear: Object.fromEntries(dataStore.years.map(y => [y, { url: null, defaultPage: null }])),
+    pageByPoint: {},
+    searchValueByPoint: {}, // `${seriesKey}|${yy}` -> raw numeric string for PDF.js #search=
+
+
+    cpiJuneIndex: Object.fromEntries(Array.from({length: 20}, (_,i)=>{
+      const year = 2005 + i;
+      return [`${year}-06`, null];
+    })),
+    populationByYear: Object.fromEntries(dataStore.years.map(y => [y, null])),
+
+    uncertainties
+  };
+
+  // Pre-seed fund total meta/series
+  fundDataset.accountMeta[fundTotalKey] = { label: fundTotalKey, aliases: [] };
+  fundDataset.series[fundTotalKey] = ensureYearMap();
+
+  // Working accumulators
+  const deptTotalsSeen = new Map(); // key: dept|yy -> total
+  const deptFromLineSum = new Map(); // key: dept|yy -> sum
+  const deptLabelByYear = new Map(); // dept -> Map(yy->label)
+  const lineLabelByYear = new Map(); // lineKey -> Map(yy->label)
+  const progLabelByCode = new Map(); // programCode -> label
+  const progDepts = new Map(); // programCode -> Set(dept)
+  const deptLines = new Map(); // dept -> Set(lineKey)
+
+  function noteLabel(map, key, yy, label){
+    if (!map.has(key)) map.set(key, new Map());
+    map.get(key).set(yy, safeText(label));
+  }
+
+  function addProgram(programCode, programLabel){
+    if (!programCode) return;
+    const code = safeText(programCode);
+    if (!code) return;
+    const lbl = safeText(programLabel || code);
+    if (!progLabelByCode.has(code) && lbl) progLabelByCode.set(code, lbl);
+    if (!progDepts.has(code)) progDepts.set(code, new Set());
+  }
+
+  function addDepartment(deptCode, deptLabel, programCode){
+    const d = safeText(deptCode);
+    if (!d) return;
+    if (!fundDataset.hierarchy.departments[d]){
+      fundDataset.hierarchy.departments[d] = { label: safeText(deptLabel) || d, program: null, lineItems: [] };
+    }
+    noteLabel(deptLabelByYear, d, stateYearYY, deptLabel);
+
+    // link to program if present
+    const p = safeText(programCode);
+    if (p){
+      fundDataset.hierarchy.departments[d].program = p;
+      if (!progDepts.has(p)) progDepts.set(p, new Set());
+      progDepts.get(p).add(d);
+    }
+  }
+
+  function addLineItem(deptCode, lineCode, lineLabel, yy){
+    const d = safeText(deptCode);
+    const lc = safeText(lineCode);
+    if (!d || !lc) return null;
+    const lineKey = `${d}-${lc}`;
+    if (!fundDataset.hierarchy.lineItems[lineKey]){
+      fundDataset.hierarchy.lineItems[lineKey] = { label: safeText(lineLabel) || lineKey, department: d };
+    }
+    if (!deptLines.has(d)) deptLines.set(d, new Set());
+    deptLines.get(d).add(lineKey);
+    noteLabel(lineLabelByYear, lineKey, yy, lineLabel);
+    return lineKey;
+  }
+
+    // Parse body rows (supports long AND wide exports)
+  // NOTE: helpers (addDepartment/addLineItem) rely on this being function-scoped.
+  var stateYearYY = null;
+
+    // In wide exports, page columns may also be year-specific (e.g., "FY13 Page" / "Page FY13").
+  // Build a best-effort map so we can prefer per-year page numbers when present.
+  const widePdfPageColByYY = {};
+  if (isWide){
+    for (const h of headers){
+      if (!h) continue;
+      if (wideYearHeaders && wideYearHeaders.includes(h)) continue; // skip the FY amount columns
+      const yy = parseYearToYY(h);
+      if (!yy || !dataStore.years.includes(yy)) continue;
+      const hs = safeText(h);
+      if (!/(pdf\s*page|pdf\b.*page|\bpage\b|\bpg\b|page\s*#|page\s*no\.?)/i.test(hs)) continue;
+
+      const prev = widePdfPageColByYY[yy];
+      if (!prev){
+        widePdfPageColByYY[yy] = h;
+      } else {
+        // Prefer a header that explicitly mentions "PDF"
+        if (!/pdf/i.test(prev) && /pdf/i.test(hs)) widePdfPageColByYY[yy] = h;
+      }
+    }
+  }
+
+
+    function getWidePdfPageForYear(row, yearHeader, fallback){
+  try{
+    const y = parseYearToYY(yearHeader);
+    if (!y || !dataStore.years.includes(y)) return fallback;
+
+    // Page-ish headers (keep this broad; wide exports are inconsistent)
+    const pageRe = /(pdf\s*page|pdf\b.*page|source\s*pdf.*page|\bpage\b|\bpg\b|page\s*#|page\s*no\.?|\bp\b)/i;
+    const fileRe = /(pdf\s*file|pdf\b.*file|source\s*pdf.*file)/i;
+
+    // 1) Try existing per-year map first
+    let colName = widePdfPageColByYY ? widePdfPageColByYY[y] : null;
+    let v = colName ? get(row, colName) : null;
+
+    // Treat "present but unusable" as missing (e.g., wrong column, "0", text, etc.)
+    const hasUsablePage = (safeText(v).length && parsePdfPageInt(v) != null);
+
+    // 2) If missing/unusable, fall back to adjacency: scan right of the FY amount column for a page column.
+    if (!hasUsablePage){
+      const yhNorm = safeText(yearHeader);
+      const yhIndex = headers.findIndex(h => safeText(h) === yhNorm);
+
+      if (yhIndex >= 0){
+        // Look a few columns to the right; stop when we hit the next FY amount column.
+        for (let j = yhIndex + 1; j < headers.length && j <= yhIndex + 6; j++){
+          const hh = headers[j];
+          if (!hh) continue;
+
+          if (wideYearHeaders && wideYearHeaders.includes(hh)) break;
+
+          const hs = safeText(hh);
+          if (fileRe.test(hs)) continue;
+          if (!pageRe.test(hs)) continue;
+
+          const v2 = get(row, hh);
+          if (safeText(v2).length && parsePdfPageInt(v2) != null){
+            colName = hh;
+            v = v2;
+            // Cache for future rows/points
+            if (widePdfPageColByYY) widePdfPageColByYY[y] = hh;
+            break;
+          }
+        }
+      }
+    }
+
+    return safeText(v).length ? v : fallback;
+  }catch(_){
+    return fallback;
+  }
+}
+
+
+  function consumeRowYear({ yy, programCode, programLabel, deptCode, deptLabel, lineCode, lineLabel, amountRaw, deptTotalRaw, pdfFileRaw, pdfPageRaw }){
+    const y = parseYearToYY(yy);
+    if (!y || !dataStore.years.includes(y)) return;
+
+    // Keep stateYear for label tracking inside helpers
+    stateYearYY = y;
+
+    const amount = parseNumber(amountRaw);
+    const deptTotal = parseNumber(deptTotalRaw);
+
+        const pdfFile = safeText(pdfFileRaw) || null;
+    const pageInt = parsePdfPageInt(pdfPageRaw);
+
+
+    // record pdfByYear from any row (prefer first non-null; fund total will overwrite defaultPage)
+    if (pdfFile && !fundDataset.pdfByYear[y].url) fundDataset.pdfByYear[y].url = pdfFile;
+
+    // program grouping (never numeric series)
+    if (programCode) addProgram(programCode, programLabel);
+
+    // Fund total row is indicated by Dept Description == "Fund {id} Total"
+    // Accept either exact match to fundTotalKey, or case-insensitive "Fund {id} Total"
+    const isFundTotalRow =
+      deptLabel === fundTotalKey ||
+      (safeText(deptLabel).toLowerCase() === `fund ${fundId} total`.toLowerCase());
+
+    const fundTotalVal = (deptTotal != null) ? deptTotal : amount;
+    const fundTotalRaw = (deptTotal != null) ? deptTotalRaw : amountRaw;
+
+    if (isFundTotalRow && fundTotalVal != null){
+      fundDataset.series[fundTotalKey][y] = fundTotalVal;
+      fundDataset.pageByPoint[`${fundTotalKey}|${y}`] = pageInt;
+      fundDataset.searchValueByPoint[`${fundTotalKey}|${y}`] = normalizePdfNumber(fundTotalRaw);
+
+      if (pdfFile) fundDataset.pdfByYear[y].url = pdfFile;
+      if (pageInt != null) fundDataset.pdfByYear[y].defaultPage = pageInt;
+
+      addAlias(fundDataset.accountMeta, fundTotalKey, fundTotalKey, y);
+      return; // do not process as dept/line
+    }
+
+    // Department subtotal row: deptCode present, lineCode missing, subtotal present in deptTotal OR amount (wide exports)
+    const isDeptSubtotal = deptCode && !lineCode && ((deptTotal != null) || (amount != null));
+    const deptSubVal = (deptTotal != null) ? deptTotal : amount;
+    const deptSubRaw = (deptTotal != null) ? deptTotalRaw : amountRaw;
+
+    // Line item row: deptCode + lineCode + amount present
+    const isLine = deptCode && lineCode && amount != null;
+
+    if (deptCode){
+      // Exclude rollups if they appear as depts (rare, but obey hard rule)
+      if (EXCLUDED_ROLLUPS.has(deptCode)) return;
+
+      addDepartment(deptCode, deptLabel, programCode);
+
+      // Ensure department series/meta exists
+      if (!fundDataset.series[deptCode]) fundDataset.series[deptCode] = ensureYearMap();
+      addAlias(fundDataset.accountMeta, deptCode, deptLabel || deptCode, y);
+
+      if (isDeptSubtotal && deptSubVal != null){
+        fundDataset.series[deptCode][y] = deptSubVal;
+        deptTotalsSeen.set(`${deptCode}|${y}`, deptSubVal);
+        fundDataset.pageByPoint[`${deptCode}|${y}`] = pageInt;
+        // Use the raw CSV subtotal text as the PDF.js numeric search token (best match to the PDF table)
+        fundDataset.searchValueByPoint[`${deptCode}|${y}`] = normalizePdfNumber(deptSubRaw);
+      }
+
+      if (isLine){
+        const lineKey = addLineItem(deptCode, lineCode, lineLabel, y);
+        if (lineKey){
+          if (!fundDataset.series[lineKey]) fundDataset.series[lineKey] = ensureYearMap();
+          fundDataset.series[lineKey][y] = amount;
+          addAlias(fundDataset.accountMeta, lineKey, lineLabel || lineKey, y);
+                    fundDataset.pageByPoint[`${lineKey}|${y}`] = pageInt;
+          fundDataset.searchValueByPoint[`${lineKey}|${y}`] = normalizePdfNumber(amountRaw);
+
+          // If the dept subtotal row has no usable PDF page (null / non-numeric), fall back to the first line-item page we see.
+          const deptPointKey = `${deptCode}|${y}`;
+          if (pageInt != null && fundDataset.pageByPoint[deptPointKey] == null){
+            fundDataset.pageByPoint[deptPointKey] = pageInt;
+          }
+
+
+          // accumulate fallback dept sums (used if no dept subtotal)
+          const k = `${deptCode}|${y}`;
+          deptFromLineSum.set(k, (deptFromLineSum.get(k) || 0) + amount);
+        }
+      }
+    }
+  }
+
+  for (const row of body){
+    const programRaw = safeText(get(row, col.program));
+    const { code: programCode, label: programLabel } = splitCodeLabel(programRaw);
+
+    const deptCodeRaw = get(row, col.deptCode);
+    const deptCode = safeText(deptCodeRaw).replace(/\.0$/, "");
+    const deptLabel = safeText(get(row, col.deptLabel));
+
+    const lineCodeRaw = get(row, col.lineCode);
+    const lineCode = safeText(lineCodeRaw).replace(/\.0$/, "");
+    const lineLabel = safeText(get(row, col.lineLabel));
+
+    const pdfFileRaw0 = safeText(get(row, col.pdfFile)) || null;
+    const pdfPageRaw0 = get(row, col.pdfPage);
+
+        if (isWide){
+      for (const yh of wideYearHeaders){
+        const amountRaw = get(row, yh);
+        // Skip empty cells quickly (but keep explicit zeros)
+        if (!safeText(amountRaw).length && !safeText(get(row, col.deptTotal)).length) continue;
+
+        const y2 = parseYearToYY(yh);
+                const pdfPageCol = (y2 && (typeof widePdfPageColByYY !== "undefined")) ? widePdfPageColByYY[y2] : null;
+        const pdfPageRaw = (pdfPageCol) ? get(row, pdfPageCol) : pdfPageRaw0;
+
+
+        consumeRowYear({
+          yy: yh,
+          programCode,
+          programLabel,
+          deptCode,
+          deptLabel,
+          lineCode,
+          lineLabel,
+          amountRaw,
+          deptTotalRaw: get(row, col.deptTotal),
+                    pdfFileRaw: pdfFileRaw0,
+          pdfPageRaw: getWidePdfPageForYear(row, yh, pdfPageRaw0)
+        });
+
+      }
+    } else {
+
+      const yy = parseYearToYY(get(row, col.fiscalYear));
+      if (!yy || !dataStore.years.includes(yy)) continue;
+
+      consumeRowYear({
+        yy,
+        programCode,
+        programLabel,
+        deptCode,
+        deptLabel,
+        lineCode,
+        lineLabel,
+        amountRaw: get(row, col.amount),
+        deptTotalRaw: get(row, col.deptTotal),
+        pdfFileRaw: pdfFileRaw0,
+        pdfPageRaw: pdfPageRaw0
+      });
+    }
+  }
+
+
+  // Finalize hierarchy: programs list per topGroup
+  for (const [pCode, pLabel] of progLabelByCode.entries()){
+    fundDataset.hierarchy.programs[pCode] = {
+      label: pLabel,
+      topGroup: topGroupDefault,
+      departments: Array.from(progDepts.get(pCode) || [])
+    };
+  }
+  // Link programs into topGroup
+  const programCodes = Object.keys(fundDataset.hierarchy.programs).sort();
+  fundDataset.hierarchy.topGroups[topGroupDefault].programs = programCodes;
+
+  // Finalize departments (attach lineItems list)
+  for (const d of Object.keys(fundDataset.hierarchy.departments)){
+    const set = deptLines.get(d) || new Set();
+    fundDataset.hierarchy.departments[d].lineItems = Array.from(set).sort();
+  }
+
+  // Finalize accountMeta canonical+aliases
+  finalizeMeta(fundDataset.accountMeta);
+
+  // Fill missing dept totals from line sums when dept subtotal is missing
+  for (const d of Object.keys(fundDataset.hierarchy.departments)){
+    for (const yy of dataStore.years){
+      if (fundDataset.series[d][yy] == null){
+        const k = `${d}|${yy}`;
+        if (deptFromLineSum.has(k)){
+          fundDataset.series[d][yy] = deptFromLineSum.get(k);
+          // pageByPoint for derived totals is unknown unless a dept subtotal row existed
+        }
+      }
+    }
+  }
+
+  // Phase 1 validation (fund total vs sum of departments only to avoid double-counting)
+  const mismatches = [];
+  for (const yy of dataStore.years){
+    const fundTotal = fundDataset.series[fundTotalKey][yy];
+    if (fundTotal == null) continue;
+    let sum = 0, any=false;
+    for (const d of Object.keys(fundDataset.hierarchy.departments)){
+      const v = fundDataset.series[d]?.[yy];
+      if (v == null) continue;
+      sum += v; any=true;
+    }
+    if (!any) continue;
+    const diff = (fundTotal - sum);
+    if (Math.abs(diff) > 0.01){
+      mismatches.push({ yy, fundTotal, sumIncluded: sum, difference: diff });
+    }
+  }
+
+  // Coverage audits (departments + line items)
+  function coverageFor(keys){
+    const late=[], early=[], gaps=[];
+    for (const k of keys){
+      const s = fundDataset.series[k];
+      if (!s) continue;
+      const years = dataStore.years;
+      let first=null, last=null;
+      for (const yy of years){
+        if (s[yy] != null){
+          if (first == null) first = yy;
+          last = yy;
+        }
+      }
+      if (first == null) continue;
+      if (first > "05") late.push({ key:k, first });
+      if (last < "24") early.push({ key:k, last });
+      // gaps
+      let seen=false, inGap=false;
+      for (const yy of years){
+        if (s[yy] != null){
+          if (!seen) seen=true;
+          if (inGap){ gaps.push({ key:k }); inGap=false; break; }
+        } else {
+          if (seen && yy < last) inGap=true;
+        }
+      }
+    }
+    return { late, early, gaps };
+  }
+
+  const deptKeys = Object.keys(fundDataset.hierarchy.departments);
+  const lineKeys = Object.keys(fundDataset.hierarchy.lineItems);
+
+  const deptCov = coverageFor(deptKeys);
+  const lineCov = coverageFor(lineKeys);
+
+  // Short-lived
+  function shortLived(keys){
+    const out=[];
+    for (const k of keys){
+      const s = fundDataset.series[k]; if (!s) continue;
+      const count = dataStore.years.reduce((a,yy)=>a+(s[yy]!=null?1:0),0);
+      if (count > 0 && count < 5) out.push({ key:k, years:count });
+    }
+    return out.sort((a,b)=>a.years-b.years);
+  }
+
+  const deptShort = shortLived(deptKeys);
+  const lineShort = shortLived(lineKeys);
+
+  // Outliers: simple neighbor-based
+  const outliers = [];
+  function flagOutliers(keys){
+    for (const k of keys){
+      const s = fundDataset.series[k]; if (!s) continue;
+      for (let i=1;i<dataStore.years.length-1;i++){
+        const yPrev = dataStore.years[i-1];
+        const y = dataStore.years[i];
+        const yNext = dataStore.years[i+1];
+        const a = s[yPrev], b = s[y], c = s[yNext];
+        if (a==null || b==null || c==null) continue;
+        if (a<=0 || b<=0 || c<=0) continue;
+        const mx = Math.max(a,c), mn = Math.min(a,c);
+        if (b > 1.8*mx){
+          outliers.push({ key:k, yy:y, value:b, rationale:"Spike vs neighbors" });
+        } else if (b*1.8 < mn){
+          outliers.push({ key:k, yy:y, value:b, rationale:"Drop vs neighbors" });
+        } else if (b < 0.25*mn){
+          outliers.push({ key:k, yy:y, value:b, rationale:"Tiny vs neighbors" });
+        }
+      }
+    }
+  }
+  flagOutliers(deptKeys);
+  flagOutliers(lineKeys);
+
+  // Attach audit summary
+  fundDataset._audit = {
+    schema: { type: schemaType, columns: col },
+    fundTotalMismatches: mismatches,
+    coverage: { departments: deptCov, lineItems: lineCov },
+    shortLived: { departments: deptShort, lineItems: lineShort },
+    outliers: outliers.slice(0, 200) // cap for UI display; data still in series untouched
+  };
+
+  // Add CPI/population uncertainties if missing
+  fundDataset.uncertainties.push("No CPI/Inflation or population columns detected; placeholders are null.");
+  fundDataset.uncertainties.push("Line item codes repeat across departments; line-item series keys are composite 'DeptCode-LineCode'.");
+
+  return fundDataset;
+}
+
+async function tryLoadFund(fundId){
+  const fr = dataStore.fundRegistry[fundId] || null;
+  const url = csvPathForFund(fundId);
+
+  if (fr){
+    fr.loaded = false;
+    fr.loadPath = url;
+    fr.loadError = "";
+  }
+
+  if (!url){
+    if (fr) fr.loadError = "Bad fund code";
+    return null;
+  }
+
+  try{
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok){
+      console.error(`[CSV LOAD] ${fundId} failed: HTTP ${res.status} for ${url}`);
+      if (fr) fr.loadError = `HTTP ${res.status}`;
+      return null;
+    }
+
+    const text = await res.text();
+    const title = dataStore.fundRegistry[fundId]?.title || `Fund #${fundId}`;
+        const fd = buildFundDatasetFromCSV(fundId, title, text);
+    dataStore.funds[fundId] = fd;
+
+    // If the CSV fetched OK but parsed into no usable data, treat as a load failure (schema mismatch).
+    const hasAnyDept = fd && fd.hierarchy && fd.hierarchy.departments && Object.keys(fd.hierarchy.departments).length > 0;
+    const hasAnyLine = fd && fd.hierarchy && fd.hierarchy.lineItems && Object.keys(fd.hierarchy.lineItems).length > 0;
+    const hasAnySeries = fd && fd.series && Object.keys(fd.series).some(k=>{
+      const m = fd.series[k];
+      if (!m) return false;
+      for (const yy of Object.keys(m)){
+        if (m[yy] != null && isFinite(m[yy])) return true;
+      }
+      return false;
+    });
+
+    if (!hasAnySeries && !hasAnyDept && !hasAnyLine){
+      delete dataStore.funds[fundId];
+      if (fr){
+        fr.loaded = false;
+        fr.loadError = "Parsed 0 rows (CSV delimiter/header/schema mismatch)";
+      }
+      console.warn(`[CSV LOAD] ${fundId} fetched OK but parsed empty — check delimiter/headers`);
+      return null;
+    }
+
+    if (fr){
+      fr.loaded = true;
+      fr.loadError = "";
+      fr.loadPath = url;
+    }
+
+
+    console.log(`[CSV LOAD] ${fundId} ok: rows=${text.split(/\r?\n/).length}`);
+    return fd;
+    }catch(e){
+    console.error(`[CSV LOAD] ${fundId} threw`, e);
+    const msg = (e && (e.message || e.toString)) ? (e.message || e.toString()) : String(e);
+    if (fr) fr.loadError = `Load failed: ${msg}`;
+    return null;
+  }
+
+}
+
+
+async function loadAllFunds(){
+  // reset loaded flags + funds
+  for (const id of Object.keys(dataStore.fundRegistry)){
+    dataStore.fundRegistry[id].loaded = false;
+    dataStore.fundRegistry[id].loadError = "";
+    dataStore.fundRegistry[id].loadPath = csvPathForFund(id);
+  }
+  dataStore.funds = {};
+  const ids = Object.keys(dataStore.fundRegistry);
+  for (const id of ids){
+    await tryLoadFund(id);
+  }
+}
+
+
+function buildTopGroupTabs(){
+  const box = $("topGroupTabs");
+  box.innerHTML = "";
+  for (const k of Object.keys(TOP_GROUPS)){
+    const b = document.createElement("div");
+    b.className = "tab" + (state.topGroup === k ? " active" : "");
+    b.textContent = TOP_GROUPS[k].label;
+    b.onclick = () => { state.topGroup = k; state.fundId=null; state.programCode=null; state.deptCode=null; state.lineKey=null; hideTooltip(); refreshUI(); };
+    box.appendChild(b);
+  }
+}
+
+function refreshFundSelect(){
+  const sel = $("fundSelect");
+  sel.innerHTML = "";
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = "Select a fund…";
+  sel.appendChild(opt0);
+
+  // list funds that belong to topGroup expectation and are loaded
+  const ids = Object.keys(dataStore.fundRegistry).sort();
+  for (const id of ids){
+    const fr = dataStore.fundRegistry[id];
+    const loaded = fr.loaded;
+    const expected = fr.topGroupsExpected || [];
+    const belongs = expected.includes(state.topGroup) || (state.topGroup==="primaryGovernment" && expected.includes("primaryGovernment"));
+    if (!belongs && loaded) {
+      // allow loaded funds even if expectation says otherwise (future-proof)
+      // but hide by default; you can remove this if desired
+    }
+    const o = document.createElement("option");
+    o.value = id;
+            let suffix = "";
+    if (!loaded){
+      const err = safeText(fr.loadError);
+      if (err){
+        suffix = (/^HTTP\b/i.test(err) || /not\s*found/i.test(err) || /fetch\s*failed/i.test(err))
+          ? " (missing CSV)"
+          : " (CSV unreadable)";
+      } else {
+        suffix = " (missing CSV)";
+      }
+    }
+    o.textContent = `${fr.title}${suffix}`;
+
+    // Keep selectable; if missing/unreachable we show a warning near the Fund selector and charts stay disabled.
+    sel.appendChild(o);
+
+  }
+
+  sel.value = state.fundId || "";
+  sel.onchange = () => {
+    state.fundId = sel.value || null;
+    // Auto-switch top-group when the chosen fund only exists in one group (e.g., Schools-only funds)
+    const fr = state.fundId ? dataStore.fundRegistry[state.fundId] : null;
+    const expected = fr?.topGroupsExpected || [];
+    if (Array.isArray(expected) && expected.length === 1 && expected[0] && state.topGroup !== expected[0]){
+      state.topGroup = expected[0];
+    }
+
+    state.programCode = null;
+    state.deptCode = null;
+    state.lineKey = null;
+    hideTooltip();
+    refreshUI();
+  };
+}
+function setFundWarning(msg){
+  const el = $("fundWarn");
+  if (!el) return;
+  const m = safeText(msg);
+  if (m){
+    el.style.display = "block";
+    el.textContent = m;
+  } else {
+    el.style.display = "none";
+    el.textContent = "";
+  }
+}
+
+function renderFundWarning(){
+  const fundId = state.fundId;
+  if (!fundId){ setFundWarning(""); return; }
+
+  const fr = dataStore.fundRegistry[fundId];
+  if (!fr){ setFundWarning(`Unknown fund: ${fundId}`); return; }
+
+  if (fr.loaded){ setFundWarning(""); return; }
+
+    const p = fr.loadPath || csvPathForFund(fundId) || "";
+  const e = fr.loadError ? ` (${fr.loadError})` : "";
+
+  // If fetch succeeded but parsing threw, don't label it as "missing/unreachable".
+  const isParseFail = !!fr.loadError && /^Load failed:/i.test(fr.loadError);
+  const base = isParseFail
+    ? `CSV loaded but parse failed for Fund ${fundId}: ${p.replace(/^\.\//,"")}`
+    : `CSV missing/unreachable for Fund ${fundId}: ${p.replace(/^\.\//,"")}`;
+
+  setFundWarning(`${base}${e}`);
+
+}
+
+function getFund(){
+  if (!state.fundId) return null;
+  return dataStore.funds[state.fundId] || null;
+}
+
+function refreshProgramSelect(){
+  const sel = $("programSelect");
+  sel.innerHTML = "";
+  const fund = getFund();
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = fund ? "All programs (fund total)" : "Select a fund first";
+  sel.appendChild(opt0);
+  sel.disabled = !fund;
+
+  if (!fund){ sel.value=""; return; }
+
+  const tg = state.topGroup;
+  const programs = (fund.hierarchy.topGroups[tg]?.programs || []).slice();
+  programs.sort();
+
+  for (const p of programs){
+    const o = document.createElement("option");
+    o.value = p;
+    o.textContent = `${p} — ${fund.hierarchy.programs[p]?.label || ""}`;
+    sel.appendChild(o);
+  }
+  sel.value = state.programCode || "";
+  sel.onchange = () => {
+    state.programCode = sel.value || null;
+    state.deptCode = null;
+    state.lineKey = null;
+    hideTooltip();
+    refreshUI();
+  };
+}
+
+function refreshDeptSelect(){
+  const sel = $("deptSelect");
+  sel.innerHTML = "";
+  const fund = getFund();
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = fund ? (state.programCode ? "Select a department…" : "All departments (fund/program)") : "Select a fund first";
+  sel.appendChild(opt0);
+  sel.disabled = !fund;
+
+  if (!fund){ sel.value=""; return; }
+
+  let deptList = [];
+  if (state.programCode){
+    deptList = (fund.hierarchy.programs[state.programCode]?.departments || []).slice();
+  } else {
+    // all depts in fund
+    deptList = Object.keys(fund.hierarchy.departments);
+  }
+  deptList.sort();
+
+  for (const d of deptList){
+    const o = document.createElement("option");
+    o.value = d;
+    const label = fund.hierarchy.departments[d]?.label || d;
+    o.textContent = `${d} — ${label}`;
+    sel.appendChild(o);
+  }
+
+  sel.value = state.deptCode || "";
+  sel.onchange = () => {
+    state.deptCode = sel.value || null;
+    state.lineKey = null;
+    hideTooltip();
+    refreshUI();
+  };
+}
+
+function refreshLineSelect(){
+  const sel = $("lineSelect");
+  sel.innerHTML = "";
+  const fund = getFund();
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = state.deptCode ? "Select a line item…" : "Select a department first";
+  sel.appendChild(opt0);
+  sel.disabled = !(fund && state.deptCode);
+
+  if (!fund || !state.deptCode){ sel.value=""; return; }
+
+  const lines = (fund.hierarchy.departments[state.deptCode]?.lineItems || []).slice();
+  lines.sort();
+
+  for (const lk of lines){
+    const o = document.createElement("option");
+    o.value = lk;
+    const label = fund.hierarchy.lineItems[lk]?.label || lk;
+    o.textContent = `${lk.split("-")[1]} — ${label}`;
+    sel.appendChild(o);
+  }
+
+  sel.value = state.lineKey || "";
+  sel.onchange = () => {
+    state.lineKey = sel.value || null;
+    hideTooltip();
+    refreshUI();
+  };
+}
+
+function refreshChips(){
+  const box = $("stateChips");
+  box.innerHTML = "";
+  const fund = getFund();
+
+  function chip(k,v){
+    const d = document.createElement("div");
+    d.className="chip";
+    d.innerHTML = `<span>${k}</span> <b>${v}</b>`;
+    box.appendChild(d);
+  }
+  chip("Top", TOP_GROUPS[state.topGroup].label);
+  chip("Fund", fund ? fund.fundTitle : "—");
+  chip("Program", state.programCode ? `${state.programCode}` : "—");
+  chip("Dept", state.deptCode ? `${state.deptCode}` : "—");
+  chip("Line", state.lineKey ? `${state.lineKey.split("-")[1]}` : "—");
+}
+
+function buildSeriesForCurrentSelection(fund){
+  // Priority: line item > department > program > fund total
+  if (state.lineKey){
+    return { key: state.lineKey, label: fund.accountMeta[state.lineKey]?.label || fund.hierarchy.lineItems[state.lineKey]?.label || state.lineKey, values: fund.series[state.lineKey] };
+  }
+  if (state.deptCode){
+    const key = state.deptCode;
+    return { key, label: fund.accountMeta[key]?.label || fund.hierarchy.departments[key]?.label || key, values: fund.series[key] };
+  }
+  if (state.programCode){
+    // Derived series: sum department totals in this program (no double count)
+    const years = dataStore.years;
+    const deptList = fund.hierarchy.programs[state.programCode]?.departments || [];
+    const values = Object.fromEntries(years.map(y=>[y,null]));
+    for (const y of years){
+      let sum=0, any=false;
+      for (const d of deptList){
+        const v = fund.series[d]?.[y];
+        if (v == null) continue;
+        sum += v; any=true;
+      }
+      values[y] = any ? sum : null;
+    }
+    const label = `${state.programCode} — ${fund.hierarchy.programs[state.programCode]?.label || ""}`.trim();
+    const key = `Program ${state.programCode}`;
+    return { key, label, values, derived:true };
+  }
+  // Fund total
+  const key = fund.fundTotalKey;
+  return { key, label: fund.accountMeta[key]?.label || key, values: fund.series[key] };
+}
+
+
+function computeChartScales(values, extraPts){
+  const pts = [];
+  for (const y of dataStore.years){
+    const v = values[y];
+    if (v == null || !isFinite(v)) continue;
+    pts.push(v);
+  }
+
+  if (Array.isArray(extraPts)){
+    for (const v of extraPts){
+      if (v == null || !isFinite(v)) continue;
+      pts.push(v);
+    }
+  }
+
+  // Safe defaults if there are no finite points
+  if (!pts.length){
+    return { yMin: 0, yMax: 1 };
+  }
+
+  let min = Math.min(...pts);
+  let max = Math.max(...pts);
+
+  if (!isFinite(min) || !isFinite(max)){
+    return { yMin: 0, yMax: 1 };
+  }
+
+  // Track real data min BEFORE any safety bump (so 0-flat series still clamps to 0)
+  const dataMin = min;
+
+  // Flat-line safety (keep chart renderable)
+  if (min === max){
+    const bump = (min === 0) ? 1 : Math.abs(min) * 0.08;
+    min -= bump;
+    max += bump;
+  }
+
+  // Smaller pad = more “dramatic” (tight zoom) while still giving headroom
+   const span = max - min;
+  const hasExtras = Array.isArray(extraPts) && extraPts.some(v => v != null && isFinite(v));
+  const pad = span * (hasExtras ? 0.03 : 0.02);
+  let rawMin = min - pad;
+  const rawMax = max + pad;
+
+  // If the series never goes below 0, never let the axis dip below 0
+  if (dataMin >= 0 && rawMin < 0) rawMin = 0;
+
+  // Must match your existing render loop: tickCount=5 => 6 labeled ticks
+  const tickCount = 5;
+
+  function niceStep(raw){
+    // Rounded "nice" steps: 1, 2, 2.5, 5, 10 × 10^n
+    if (!isFinite(raw) || raw <= 0) return 1;
+    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+    const n = raw / pow;
+    if (n < 1.5) return 1 * pow;
+    if (n < 3)   return 2 * pow;
+    if (n < 4.5) return 2.5 * pow;
+    if (n < 7)   return 5 * pow;
+    return 10 * pow;
+  }
+
+  function nextNiceStep(step){
+    if (!isFinite(step) || step <= 0) return 1;
+    const exp = Math.floor(Math.log10(step));
+    const pow = Math.pow(10, exp);
+    const n = step / pow;
+    const eps = 1e-12;
+    if (n < 1 - eps)   return 1 * pow;
+    if (n < 2 - eps)   return 2 * pow;
+    if (n < 2.5 - eps) return 2.5 * pow;
+    if (n < 5 - eps)   return 5 * pow;
+    if (n < 10 - eps)  return 10 * pow;
+    return 1 * Math.pow(10, exp + 1);
+  }
+
+  // Pick a nice step and then force yMin/yMax to land on that step so ticks are clean
+  let step = niceStep((rawMax - rawMin) / tickCount);
+  if (!isFinite(step) || step <= 0) step = 1;
+
+  for (let guard = 0; guard < 20; guard++){
+    // Try anchoring from the top (prevents dropping to 0 unnecessarily on low ranges)
+    let yMax = Math.ceil((rawMax + 1e-12) / step) * step;
+    let yMin = yMax - tickCount * step;
+
+    // If we didn't cover the bottom, anchor from the bottom instead
+    if (yMin > rawMin + 1e-9){
+      yMin = Math.floor((rawMin - 1e-12) / step) * step;
+      yMax = yMin + tickCount * step;
+    }
+
+    // Non-negative series: never show negative ticks (keeps x-axis at baseline)
+    if (dataMin >= 0 && yMin < 0){
+      yMin = 0;
+      yMax = yMin + tickCount * step;
+    }
+
+    if (yMin <= rawMin + 1e-9 && yMax >= rawMax - 1e-9){
+      return { yMin, yMax };
+    }
+
+    step = nextNiceStep(step);
+  }
+
+  // Fallback (shouldn't happen, but keeps things safe)
+  const yMin = rawMin;
+  const yMax = (rawMax === rawMin) ? rawMin + 1 : rawMax;
+  return { yMin, yMax };
+}
+
+
+
+function clearChart(){
+  $("chart").innerHTML = "";
+  $("chartTitle").textContent = "Select a fund…";
+  $("chartMeta").textContent = "";
+}
+
+function renderChart(fund){
+  const svg = $("chart");
+  svg.innerHTML = "";
+
+  const sel = buildSeriesForCurrentSelection(fund);
+  const key = sel.key;
+  const label = sel.label;
+  const values = sel.values;
+  const derived = !!sel.derived;
+
+  $("chartTitle").textContent = label || key;
+  const mode = state.lineKey ? "Line item" : state.deptCode ? "Department" : state.programCode ? "Program (derived sum of departments)" : "Fund total";
+  $("chartMeta").textContent = `${mode}${derived ? " • derived" : ""}`;
+
+  const years = dataStore.years.slice();
+  const W = 900, H = 360;
+
+  // Slightly wider left padding to avoid y-label clipping
+  const padL = 82, padR = 22, padT = 22, padB = 54;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+
+    // Ensure the y-axis includes any overlay/trend values so lines never clip above the chart
+  const scaleExtras = [];
+  const usageRunForScale = findFirstContinuousUsageRun(values, years, 5);
+
+  if (usageRunForScale){
+    const start = usageRunForScale.startIndex;
+    const baseYY = years[start];
+    const baseVal = values[baseYY];
+    const baseYearFull = 2000 + Number(baseYY);
+
+    // Include EXACTLY the overlay points we will actually draw (same gap rules as the overlay renderer)
+    if (baseVal != null && isFinite(baseVal) && baseVal !== 0 && (state.showInflation || state.showInflationPlusPopulation)){
+      const overlays = buildMacroOverlays(years, baseYearFull);
+
+      if (overlays){
+        if (state.showInflation && overlays.cpiIndex){
+          for (let i = start; i < years.length; i++){
+            const yy = years[i];
+            const idxVal = overlays.cpiIndex[i];
+            const baseSeriesVal = values[yy];
+
+            if (
+              idxVal == null || !isFinite(idxVal) ||
+              baseSeriesVal == null || !isFinite(baseSeriesVal) || baseSeriesVal === 0
+            ) continue;
+
+            scaleExtras.push(baseVal * (idxVal / 100));
+          }
+        }
+
+        if (state.showInflationPlusPopulation && overlays.cpiPopIndex){
+          for (let i = start; i < years.length; i++){
+            const yy = years[i];
+            const idxVal = overlays.cpiPopIndex[i];
+            const baseSeriesVal = values[yy];
+
+            if (
+              idxVal == null || !isFinite(idxVal) ||
+              baseSeriesVal == null || !isFinite(baseSeriesVal) || baseSeriesVal === 0
+            ) continue;
+
+            scaleExtras.push(baseVal * (idxVal / 100));
+          }
+        }
+      }
+    }
+
+    // Trendline endpoints can also exceed nominal endpoints; include endpoints for scaling
+    if (state.showTrend){
+      const n = usageRunForScale.length;
+      let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0, count = 0;
+
+      for (let j = 0; j < n; j++){
+        const yy = years[start + j];
+        const v = values[yy];
+        // Match the trend renderer: treat 0 as a gap for trend fitting
+        if (v == null || !isFinite(v) || v === 0) continue;
+
+        const x = j;
+        sumX += x; sumY += v; sumXY += x * v; sumXX += x * x; count++;
+      }
+
+      if (count >= 2){
+        const denom = (count * sumXX - sumX * sumX);
+        if (Math.abs(denom) > 1e-12){
+          const slope = (count * sumXY - sumX * sumY) / denom;
+          const intercept = (sumY - slope * sumX) / count;
+          scaleExtras.push(intercept);                 // y at start (x=0)
+          scaleExtras.push(intercept + slope * (n-1)); // y at end
+        }
+      }
+    }
+  }
+
+  const { yMin, yMax } = computeChartScales(values, scaleExtras);
+    
+
+  function xFor(i){ return padL + (i/(years.length-1)) * innerW; }
+  function yFor(v){
+    const t = (v - yMin) / (yMax - yMin);
+    return padT + (1 - t) * innerH;
+  }
+
+  // Axes
+  const axisLine = (x1,y1,x2,y2,stroke="#24324a") => {
+    const el = document.createElementNS("http://www.w3.org/2000/svg","line");
+    el.setAttribute("x1",x1); el.setAttribute("y1",y1);
+    el.setAttribute("x2",x2); el.setAttribute("y2",y2);
+    el.setAttribute("stroke",stroke);
+    el.setAttribute("stroke-width","1");
+    el.setAttribute("shape-rendering","crispEdges");
+    svg.appendChild(el);
+  };
+
+    axisLine(padL, padT, padL, padT + innerH);
+
+  // If 0 is inside the visible Y range, draw the baseline at 0.
+  // Otherwise pin it to the nearest edge so it stays visible.
+  const yBase = (yMin <= 0 && yMax >= 0) ? yFor(0)
+              : (0 < yMin) ? (padT + innerH)
+              : padT;
+
+  axisLine(padL, yBase, padL + innerW, yBase);
+
+
+  // Y grid + labels
+  const tickCount = 5;
+  for (let i=0;i<=tickCount;i++){
+    const t = i/tickCount;
+    const v = yMax - t*(yMax-yMin);
+    const y = yFor(v);
+
+    axisLine(padL, y, padL + innerW, y, "#1c2740");
+
+    const txt = document.createElementNS("http://www.w3.org/2000/svg","text");
+    txt.setAttribute("x", padL - 10);
+    txt.setAttribute("y", y + 4);
+    txt.setAttribute("fill", "#8ea0b5");
+    txt.setAttribute("font-size", "11");
+    txt.setAttribute("text-anchor", "end");
+        txt.textContent = formatAxisMoney(v);
+
+    svg.appendChild(txt);
+  }
+
+  // X labels (every 2 years)
+  for (let i=0;i<years.length;i+=2){
+    const x = xFor(i);
+    const txt = document.createElementNS("http://www.w3.org/2000/svg","text");
+    txt.setAttribute("x", x);
+    txt.setAttribute("y", padT + innerH + 36);
+    txt.setAttribute("fill", "#8ea0b5");
+    txt.setAttribute("font-size", "11");
+    txt.setAttribute("text-anchor", "middle");
+    txt.textContent = years[i];
+    svg.appendChild(txt);
+  }
+
+  // Build path with gaps (nulls)
+  let dPath = "";
+  let started = false;
+  const points = [];
+
+  for (let i=0;i<years.length;i++){
+    const yy = years[i];
+    const v = values[yy];
+    const x = xFor(i);
+    if (v == null){
+      started = false;
+      continue;
+    }
+    const y = yFor(v);
+    points.push({ yy, x, y, v });
+    dPath += (started ? " L " : " M ") + x.toFixed(2) + " " + y.toFixed(2);
+    started = true;
+  }
+
+  const path = document.createElementNS("http://www.w3.org/2000/svg","path");
+  path.setAttribute("d", dPath || "");
+  path.setAttribute("fill", "none");
+  path.setAttribute("stroke", "#4aa3ff");
+  path.setAttribute("stroke-width", "2.2");
+  path.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.appendChild(path);
+    // Optional Trend line (least-squares) across a continuous run of at least 5 years
+  if (state.showTrend){
+    // Reuse the same 5-year minimum rule as the inflation overlays:
+    // find the first continuous run of non-null values with length >= 5.
+    const usageRun = findFirstContinuousUsageRun(values, years, 5);
+
+    if (usageRun){
+      const startIdx = usageRun.startIndex;
+      const endIdx = usageRun.startIndex + usageRun.length - 1;
+
+      let n = 0, sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+
+      // Only fit the regression on this continuous run.
+      for (let i = startIdx; i <= endIdx; i++){
+        const yy = years[i];
+        const v = values[yy];
+        const xNum = 2000 + Number(yy); // real calendar year from FY label
+        // Treat 0.00 as "null" for trend: skip null, non-finite, or zero values.
+        if (v == null || !isFinite(v) || v === 0 || !isFinite(xNum)) continue;
+        n++;
+        sumX += xNum; sumY += v;
+        sumXY += xNum * v;
+        sumXX += xNum * xNum;
+      }
+
+
+      const denom = (n * sumXX - sumX * sumX);
+      if (n >= 2 && Math.abs(denom) > 1e-12){
+        const m = (n * sumXY - sumX * sumY) / denom;
+        const b = (sumY - m * sumX) / n;
+
+        // "Base year" for the trend is the first year of the 5+ year continuous run.
+        const yearA = years[startIdx];
+        const yearB = years[endIdx];
+        const xAVal = 2000 + Number(yearA);
+        const xBVal = 2000 + Number(yearB);
+
+        const yAVal = m * xAVal + b;
+        const yBVal = m * xBVal + b;
+
+        const xSvgA = xFor(startIdx);
+        const xSvgB = xFor(endIdx);
+
+        const trend = document.createElementNS("http://www.w3.org/2000/svg","path");
+        trend.setAttribute(
+          "d",
+          `M ${xSvgA.toFixed(2)} ${yFor(yAVal).toFixed(2)} L ${xSvgB.toFixed(2)} ${yFor(yBVal).toFixed(2)}`
+        );
+        trend.setAttribute("fill", "none");
+        trend.setAttribute("stroke", "#8ea0b5");
+        trend.setAttribute("stroke-width", "1.6");
+        trend.setAttribute("stroke-dasharray", "7 6");
+        trend.setAttribute("stroke-linecap", "round");
+        trend.setAttribute("vector-effect", "non-scaling-stroke");
+        trend.setAttribute("opacity", "0.9");
+        trend.style.pointerEvents = "none"; // never interfere with point taps
+        svg.appendChild(trend);
+      }
+    }
+  }
+
+
+    // CPI / Inflation + Population overlays (reference index lines scaled to base-year spending)
+  if ((state.showInflation || state.showInflationPlusPopulation) && years.length){
+    // Determine the FIRST continuous run of usage that is at least 5 years long.
+    // If there is no such run, we do not plot inflation overlays for this series at all.
+    const usageRun = findFirstContinuousUsageRun(values, years, 5);
+
+    if (usageRun){
+      const baseYY = years[usageRun.startIndex];
+      const baseVal = values[baseYY];
+
+      if (baseVal != null && isFinite(baseVal) && baseVal !== 0){
+        const baseYearFull = 2000 + Number(baseYY);
+        const overlays = buildMacroOverlays(years, baseYearFull);
+
+        if (overlays){
+          const scale = baseVal / 100; // index=100 => baseVal dollars at base year
+          const inflationDots = [];
+          const inflationPopDots = [];
+
+                    // CPI-only overlay (Inflation)
+          if (state.showInflation && overlays.cpiIndex){
+            let dInfl = "";
+            let startedInfl = false;
+            overlays.cpiIndex.forEach((idxVal, i) => {
+              const yy = years[i];
+              const baseSeriesVal = values[yy];
+
+                            // Only draw starting at the first continuous-usage year; treat earlier years
+              // and null base-series years as gaps (0.00 is a real value, not "missing").
+              if (
+                i < usageRun.startIndex ||
+                idxVal == null ||
+                baseSeriesVal == null ||
+                !isFinite(baseSeriesVal)
+              ){
+                startedInfl = false;
+                return;
+              }
+
+
+              const x = xFor(i);
+              const overlayVal = baseVal * (idxVal / 100);   // nominal overlay dollars for that year
+              const realVal = baseVal;                       // constant base-year real dollars (by construction)
+              const y = yFor(idxVal * scale);
+
+
+              dInfl += (startedInfl ? " L " : " M ") + x.toFixed(2) + " " + y.toFixed(2);
+              startedInfl = true;
+
+              inflationDots.push({
+                yy: years[i],
+                x,
+                y,
+                overlayVal,
+                realVal
+              });
+            });
+
+            if (dInfl){
+              const cpiPath = document.createElementNS("http://www.w3.org/2000/svg","path");
+              cpiPath.setAttribute("d", dInfl);
+              cpiPath.setAttribute("fill", "none");
+              cpiPath.setAttribute("stroke", "#ffcc66"); // distinct from main + trend
+              cpiPath.setAttribute("stroke-width", "1.3");
+              cpiPath.setAttribute("stroke-dasharray", "4 4");
+              cpiPath.setAttribute("vector-effect", "non-scaling-stroke");
+              cpiPath.setAttribute("opacity", "0.95");
+              cpiPath.style.pointerEvents = "none"; // never interfere with point taps
+              svg.appendChild(cpiPath);
+            }
+
+            // Dots + tooltips for CPI overlay
+            for (const p of inflationDots){
+              // Hit target
+              const hit = document.createElementNS("http://www.w3.org/2000/svg","circle");
+              hit.setAttribute("cx", p.x);
+              hit.setAttribute("cy", p.y);
+              hit.setAttribute("r", 10);
+              hit.setAttribute("fill", "transparent");
+              hit.setAttribute("data-hit", "1");
+              hit.style.cursor = "pointer";
+              hit.style.pointerEvents = "all";
+
+              // Visible dot
+              const dot = document.createElementNS("http://www.w3.org/2000/svg","circle");
+              dot.setAttribute("cx", p.x);
+              dot.setAttribute("cy", p.y);
+              dot.setAttribute("r", 3.0);
+              dot.setAttribute("fill", "#ffcc66");
+              dot.setAttribute("stroke", "#111522");
+              dot.setAttribute("stroke-width", "1");
+              dot.setAttribute("data-hit", "1");
+              dot.style.pointerEvents = "none";
+
+              const activateOverlay = (ev) => {
+                if (ev && ev.preventDefault) ev.preventDefault();
+                if (ev && ev.stopPropagation) ev.stopPropagation();
+                const touch = ev && ev.touches && ev.touches[0];
+                showTooltip({
+                  seriesKey: "overlay:inflation",
+                  seriesLabel: "Inflation",
+                  yy: p.yy,
+                  value: p.overlayVal,
+                  realValue: p.realVal,
+                  fund: null,
+                  clientX: ev && (ev.clientX ?? (touch && touch.clientX)),
+                  clientY: ev && (ev.clientY ?? (touch && touch.clientY))
+                });
+              };
+
+              hit.addEventListener("pointerdown", activateOverlay, { passive: false });
+              hit.addEventListener("click", activateOverlay);
+              hit.addEventListener("touchstart", activateOverlay, { passive: false });
+
+              svg.appendChild(hit);
+              svg.appendChild(dot);
+            }
+          }
+
+                    // CPI + Population overlay (Inflation + Population)
+          if (state.showInflationPlusPopulation && overlays.cpiPopIndex){
+            let dInflPop = "";
+            let startedInflPop = false;
+            overlays.cpiPopIndex.forEach((idxVal, i) => {
+              const yy = years[i];
+              const baseSeriesVal = values[yy];
+
+                            // Only draw starting at the first continuous-usage year; treat earlier years
+              // and null base-series years as gaps (0.00 is a real value, not "missing").
+              if (
+                i < usageRun.startIndex ||
+                idxVal == null ||
+                baseSeriesVal == null ||
+                !isFinite(baseSeriesVal)
+              ){
+                startedInflPop = false;
+                return;
+              }
+
+
+              const x = xFor(i);
+              const cpiIdx = overlays.cpiIndex ? overlays.cpiIndex[i] : null;
+              const overlayVal = baseVal * (idxVal / 100); // nominal overlay dollars
+              const realVal = (cpiIdx && isFinite(cpiIdx))
+                ? baseVal * (idxVal / cpiIdx)              // base-year real dollars including population growth
+                : null;
+              const y = yFor(idxVal * scale);
+
+
+              dInflPop += (startedInflPop ? " L " : " M ") + x.toFixed(2) + " " + y.toFixed(2);
+              startedInflPop = true;
+
+              inflationPopDots.push({
+                yy: years[i],
+                x,
+                y,
+                overlayVal,
+                realVal
+              });
+            });
+
+            if (dInflPop){
+              const cpiPopPath = document.createElementNS("http://www.w3.org/2000/svg","path");
+              cpiPopPath.setAttribute("d", dInflPop);
+              cpiPopPath.setAttribute("fill", "none");
+              cpiPopPath.setAttribute("stroke", "#44d17a"); // distinct second overlay
+              cpiPopPath.setAttribute("stroke-width", "1.3");
+              cpiPopPath.setAttribute("stroke-dasharray", "2 6");
+              cpiPopPath.setAttribute("vector-effect", "non-scaling-stroke");
+              cpiPopPath.setAttribute("opacity", "0.95");
+              cpiPopPath.style.pointerEvents = "none"; // never interfere with point taps
+              svg.appendChild(cpiPopPath);
+            }
+
+            // Dots + tooltips for CPI + Population overlay
+            for (const p of inflationPopDots){
+              const hit = document.createElementNS("http://www.w3.org/2000/svg","circle");
+              hit.setAttribute("cx", p.x);
+              hit.setAttribute("cy", p.y);
+              hit.setAttribute("r", 10);
+              hit.setAttribute("fill", "transparent");
+              hit.setAttribute("data-hit", "1");
+              hit.style.cursor = "pointer";
+              hit.style.pointerEvents = "all";
+
+              const dot = document.createElementNS("http://www.w3.org/2000/svg","circle");
+              dot.setAttribute("cx", p.x);
+              dot.setAttribute("cy", p.y);
+              dot.setAttribute("r", 3.0);
+              dot.setAttribute("fill", "#44d17a");
+              dot.setAttribute("stroke", "#111522");
+              dot.setAttribute("stroke-width", "1");
+              dot.setAttribute("data-hit", "1");
+              dot.style.pointerEvents = "none";
+
+              const activateOverlay = (ev) => {
+                if (ev && ev.preventDefault) ev.preventDefault();
+                if (ev && ev.stopPropagation) ev.stopPropagation();
+                const touch = ev && ev.touches && ev.touches[0];
+                showTooltip({
+                  seriesKey: "overlay:inflationPlusPopulation",
+                  seriesLabel: "Inflation + Population",
+                  yy: p.yy,
+                  value: p.overlayVal,
+                  realValue: p.realVal,
+                  fund: null,
+                  clientX: ev && (ev.clientX ?? (touch && touch.clientX)),
+                  clientY: ev && (ev.clientY ?? (touch && touch.clientY))
+                });
+              };
+
+              hit.addEventListener("pointerdown", activateOverlay, { passive: false });
+              hit.addEventListener("click", activateOverlay);
+              hit.addEventListener("touchstart", activateOverlay, { passive: false });
+
+              svg.appendChild(hit);
+              svg.appendChild(dot);
+            }
+          }
+        }
+      }
+    }
+  }
+
+    // Points (add a larger invisible hit target so clicks always register)
+  for (const p of points){
+   
+
+    // Hit target
+    const hit = document.createElementNS("http://www.w3.org/2000/svg","circle");
+
+    hit.setAttribute("cx", p.x);
+    hit.setAttribute("cy", p.y);
+    hit.setAttribute("r", 14);                 // big click/tap target
+    hit.setAttribute("fill", "transparent");
+    hit.setAttribute("data-hit", "1");
+    hit.style.cursor = "pointer";
+    hit.style.pointerEvents = "all";
+
+    // Visual point
+    const c = document.createElementNS("http://www.w3.org/2000/svg","circle");
+    c.setAttribute("cx", p.x);
+    c.setAttribute("cy", p.y);
+    c.setAttribute("r", 4.0);
+    c.setAttribute("fill", "#e7eef8");
+    c.setAttribute("stroke", "#4aa3ff");
+            c.setAttribute("stroke-width", "1.5");
+    c.setAttribute("data-hit", "1");
+    c.style.pointerEvents = "none"; // events handled by the hit circle
+
+
+
+    const activate = (ev) => {
+      if (ev && ev.preventDefault) ev.preventDefault();
+      if (ev && ev.stopPropagation) ev.stopPropagation();
+      showTooltip({
+        seriesKey: key,
+        seriesLabel: label,
+        yy: p.yy,
+        value: p.v,
+        fund,
+        clientX: ev && (ev.clientX ?? (ev.touches && ev.touches[0] && ev.touches[0].clientX)),
+        clientY: ev && (ev.clientY ?? (ev.touches && ev.touches[0] && ev.touches[0].clientY))
+      });
+    };
+
+    hit.addEventListener("pointerdown", activate, { passive: false });
+    hit.addEventListener("click", activate);
+
+    svg.appendChild(hit);
+    svg.appendChild(c);
+  }
+
+  // Close tooltip when tapping/clicking empty background (avoid stacking listeners)
+  svg.style.touchAction = "manipulation";
+  if (svg._bgCloseHandler){
+    svg.removeEventListener("pointerdown", svg._bgCloseHandler);
+  }
+  svg._bgCloseHandler = (ev) => {
+    const t = ev && ev.target;
+    if (t && t.getAttribute && t.getAttribute("data-hit") === "1") return; // clicked a point
+    hideTooltip();
+  };
+  svg.addEventListener("pointerdown", svg._bgCloseHandler, { passive: true });
+}
+
+
+function showTooltip({ seriesKey, seriesLabel, yy, value, fund, realValue=null, clientX=null, clientY=null }){
+
+  const tip = $("tooltip");
+  const openBtn = $("openPdfBtn");
+  const copyBtn = $("copySearchBtn");
+  const linkEl = $("ttPdfLink");
+  const warnRow = $("ttWarnRow");
+  const warnEl = $("ttWarn");
+
+        const code = safeText(seriesKey);
+  const label = safeText(seriesLabel);
+
+      // Per-point YTD token (from CSV) — used only as a verifier INSIDE the anchored row (NOT as a global #search)
+  const pointKey = `${seriesKey}|${yy}`;
+  const ytdToken = fund?.searchValueByPoint?.[pointKey] || formatPdfSearchNumber(value) || null;
+
+  // Locator for PDF highlighting: anchor on left-column identifier, then pick the YTD cell for that row by column geometry
+  const locator = buildPdfSmartLocator(fund, seriesKey);
+  const locatorText = formatPdfSmartLocator(locator);
+
+  
+  // Program tooltip special-case:
+  // Program series keys are formatted as "Program 52000" (see buildSeriesForCurrentSelection()) and are DERIVED SUMS
+  // of multiple department totals. That derived value does NOT exist as a single row in the PDF, so it cannot be
+  // searched/highlighted directly.
+  // For Program points ONLY: open the FY PDF to the FIRST relevant department page in this program (lowest page number for that FY).
+  // No highlight is performed for Program points.
+  const programCodeFromSeriesKey = (() => {
+    const sk = safeText(seriesKey);
+    if (!sk) return null;
+    const m = sk.match(/^Program\s+(\d{5})$/);
+    if (m) return m[1];
+    if (/^\d{5}$/.test(sk)) return sk;
+    return null;
+  })();
+
+  const isProgramPoint = (
+    !!fund &&
+    !state.lineKey &&
+    !state.deptCode &&
+    !!state.programCode &&
+    !!programCodeFromSeriesKey &&
+    String(programCodeFromSeriesKey) === String(state.programCode) &&
+    !!fund.hierarchy?.programs?.[String(state.programCode)]
+  );
+
+  let programDeptList = [];
+  let programFirstDept = null;
+  let programFirstPage = null;
+  let programWarn = null;
+
+  let pdfSeriesKey = seriesKey;
+  let pdfYtdToken = ytdToken;
+  let pdfLocator = locator;
+  let pdfLocatorText = locatorText;
+
+  if (isProgramPoint){
+    programDeptList = (fund.hierarchy.programs[String(state.programCode)]?.departments || []).slice();
+    programDeptList.sort();
+
+    let best = null;
+
+    for (const d of programDeptList){
+      // Prefer the department subtotal page when present; otherwise fall back to the earliest line-item page in that department.
+      const prDept = fund.pageByPoint?.[`${d}|${yy}`];
+      let p = (prDept != null && isFinite(prDept) && prDept > 0) ? Math.round(prDept) : null;
+
+      if (p == null){
+        const lines = fund.hierarchy?.departments?.[String(d)]?.lineItems || [];
+        for (const lk of lines){
+          const prLine = fund.pageByPoint?.[`${lk}|${yy}`];
+          const p2 = (prLine != null && isFinite(prLine) && prLine > 0) ? Math.round(prLine) : null;
+          if (p2 == null) continue;
+          if (p == null || p2 < p) p = p2;
+        }
+      }
+
+      if (p == null) continue;
+
+      if (!best || p < best.page || (p === best.page && String(d) < String(best.dept))){
+        best = { dept: d, page: p };
+      }
+    }
+
+    if (best){
+      programFirstDept = best.dept;
+      programFirstPage = best.page;
+    } else if (programDeptList.length){
+      programFirstDept = programDeptList[0];
+      programWarn = `No page number found for Program ${state.programCode} departments in FY${yy}; opening the PDF at its default page.`;
+    } else {
+      programWarn = `Program ${state.programCode} has no department list in this CSV; cannot jump to a department page.`;
+    }
+
+    if (programFirstDept){
+      // Use the anchor department's page mapping for navigation.
+      pdfSeriesKey = programFirstDept;
+
+      // Program points: NO highlight (derived total isn't on the PDF). Keep Search text informational only.
+      pdfYtdToken = null;
+      pdfLocator = null;
+      pdfLocatorText = programFirstPage
+        ? `Dept ${programFirstDept} (first page: ${programFirstPage}; no highlight for Program sums)`
+        : `Dept ${programFirstDept} (no highlight for Program sums)`;
+    }
+  }
+
+
+
+    $("ttKey").textContent = label || code || "—";
+  $("ttVal").textContent = (realValue != null && isFinite(realValue))
+    ? `${formatMoney(value)} (real: ${formatMoney(realValue)})`
+    : formatMoney(value);
+  $("ttYear").textContent = yy;
+
+      const searchEl = $("ttSearch");
+  if (searchEl) searchEl.textContent = pdfLocatorText || "—";
+
+  
+  const progRow = $("ttProgramRow");
+  const progInfo = $("ttProgramInfo");
+  if (progRow && progInfo){
+    if (isProgramPoint && programDeptList.length){
+      progRow.style.display = "flex";
+      const list = programDeptList.join(", ");
+      const openHint = programFirstDept
+        ? `Open FY PDF jumps to Dept ${programFirstDept}${programFirstPage ? " (first page: " + programFirstPage + ")" : ""}.`
+        : "Open FY PDF jumps to the first department in this program.";
+      progInfo.textContent = `This value is the sum of Dept Codes ${list}, and not a single value on this document. ${openHint}`;
+    } else {
+      progRow.style.display = "none";
+      progInfo.textContent = "";
+    }
+  }
+
+
+
+
+  // Position tooltip near the click/tap
+
+    try{
+    const wrap = tip.closest(".chartWrap") || tip.parentElement;
+    const r = wrap.getBoundingClientRect();
+
+    // Measure tooltip size safely (even if it was display:none)
+    const prevDisplay = tip.style.display;
+    const prevVis = tip.style.visibility;
+
+    tip.style.display = "block";
+    tip.style.visibility = "hidden";
+    tip.style.transform = "none";
+
+    const tipW = tip.offsetWidth || 0;
+    const tipH = tip.offsetHeight || 0;
+
+    const margin = 8;
+    const offset = 12;
+
+    // Use visualViewport when available (mobile address bar / pinch-zoom)
+    const vv = window.visualViewport;
+    const vw = vv ? vv.width : window.innerWidth;
+    const vh = vv ? vv.height : window.innerHeight;
+    const vLeft = vv ? vv.offsetLeft : 0;
+    const vTop  = vv ? vv.offsetTop : 0;
+
+    // vx/vy are viewport coords; convert to wrap-relative at the end
+    let vx = r.left + 12;
+    let vy = r.top + 12;
+
+    if (clientX != null && clientY != null){
+      // default: down/right of the tap
+      vx = clientX + offset;
+      vy = clientY + offset;
+
+      // flip left/up if we'd run off-screen
+      if (vx + tipW + margin > vLeft + vw) vx = clientX - tipW - offset;
+      if (vy + tipH + margin > vTop  + vh) vy = clientY - tipH - offset;
+
+      // clamp inside visible viewport
+      vx = Math.max(vLeft + margin, Math.min(vx, vLeft + vw - tipW - margin));
+      vy = Math.max(vTop  + margin, Math.min(vy, vTop  + vh - tipH - margin));
+      // also clamp inside the chart wrapper (prevents right-edge clipping even when viewport is wider)
+      const wLeft = r.left + margin;
+      const wRight = r.right - margin;
+      const wTop = r.top + margin;
+      const wBottom = r.bottom - margin;
+
+      const maxX = Math.max(wLeft, wRight - tipW);
+      const maxY = Math.max(wTop,  wBottom - tipH);
+
+      vx = Math.max(wLeft, Math.min(vx, maxX));
+      vy = Math.max(wTop,  Math.min(vy, maxY));
+
+    }
+
+    tip.style.left = Math.round(vx - r.left) + "px";
+    tip.style.top  = Math.round(vy - r.top) + "px";
+
+    // Restore (showTooltip will set display="block" at the end)
+    tip.style.visibility = prevVis;
+    tip.style.display = prevDisplay;
+  }catch(_){}
+
+
+                // Always resolve via pageByPoint[`${seriesKey}|${yy}`], fallback to pdfByYear[yy].defaultPage
+        // IMPORTANT: do NOT pass the YTD amount as PDF.js #search (e.g., "0.00" highlights everything);
+        // the smart highlighter (dept/line/total anchor -> ONE YTD cell) handles highlighting after open.
+        const { href, nativeHref, page, display, urlRaw } = buildPdfHref(fund, pdfSeriesKey, yy, null);
+
+
+
+
+
+  // PDF link (clickable)
+  if (linkEl){
+    if (href){
+      linkEl.textContent = `${display || "PDF"}${page!=null ? " (page " + page + ")" : ""}`;
+      linkEl.href = href;
+      linkEl.style.pointerEvents = "auto";
+      linkEl.style.opacity = "1";
+    } else {
+      linkEl.textContent = "—";
+      linkEl.removeAttribute("href");
+      linkEl.style.pointerEvents = "none";
+      linkEl.style.opacity = ".75";
+    }
+  }
+
+        // Open button (explicit user click -> hardened opener)
+      if (openBtn){
+    openBtn.disabled = !href;
+    openBtn.textContent = href ? "Open FY PDF" : "No PDF for this point";
+    openBtn.onclick = href ? () => {
+      // Always open via a direct user gesture.
+      const res = openPdfUserGesture(href);
+
+      // Program points: navigation only (derived sum isn't on the PDF, so no highlight/search attempt).
+      if (isProgramPoint) return;
+
+      // Dept/Line/Fund: open + inject highlight if we have a window handle
+      if (res && res.win){
+        // Use warn row for runtime issues (popup blocked, viewer not ready, OCR mismatch, etc.)
+                smartHighlightPdfjs(res.win, {
+          page,
+          locator: pdfLocator,
+          ytdToken: pdfYtdToken,
+          onWarn: (msg) => {
+            if (warnRow && warnEl){
+              warnRow.style.display = "flex";
+              warnEl.textContent = msg;
+            }
+          }
+        });
+
+      } else {
+        if (warnRow && warnEl){
+          warnRow.style.display = "flex";
+          warnEl.textContent = "Auto-highlight needs popups (window.open). If it didn’t highlight, allow popups for 127.0.0.1 and try again.";
+        }
+      }
+        } : null;
+  }
+
+  // Graceful failure: if the FY PDF is missing, warn + disable Open FY PDF (never crashes)
+  if (href && urlRaw){
+    const key = urlRaw;
+    const cached = pdfExistsCache.get(key);
+
+    if (cached === false){
+      if (openBtn){
+        openBtn.disabled = true;
+        openBtn.textContent = "PDF missing for this FY";
+      }
+      if (warnRow && warnEl){
+        warnRow.style.display = "flex";
+        warnEl.textContent = `PDF not found: ${key.replace(/^\.\//,"")}`;
+      }
+    } else if (cached !== true){
+      pdfExistsCache.set(key, "checking");
+
+      const expectedHref = href;
+      const expectedKey = key;
+
+      checkPdfExists(key).then((ok) => {
+        pdfExistsCache.set(expectedKey, ok);
+
+        // Only update if this same tooltip is still showing the same link
+        const curLink = $("ttPdfLink");
+        const curHref = curLink ? (curLink.getAttribute("href") || "") : "";
+        if (curHref !== expectedHref) return;
+
+        if (!ok){
+          const openNow = $("openPdfBtn");
+          if (openNow){
+            openNow.disabled = true;
+            openNow.textContent = "PDF missing for this FY";
+          }
+          const wr = $("ttWarnRow");
+          const we = $("ttWarn");
+          if (wr && we){
+            wr.style.display = "flex";
+            const existing = safeText(we.textContent);
+            const add = `PDF not found: ${expectedKey.replace(/^\.\//,"")}`;
+            we.textContent = existing && existing !== "—" ? (existing + " " + add) : add;
+          }
+        }
+      });
+    }
+  }
+
+
+    // Native PDF fallback + Copy Locator button removed (tooltip now only shows Open FY PDF + Close)
+
+
+
+
+
+    // Notes / warnings (Program runtime warnings + iOS page-fragment hint)
+  if (warnRow && warnEl){
+    const iosMsg = (href && page != null && shouldShowPageJumpHint())
+      ? `Safari/iOS may ignore “#page”. If it opens on the wrong page, jump to page ${page} manually inside the PDF.`
+      : null;
+
+    const msg = [programWarn, iosMsg].filter(Boolean).join(" ");
+
+    if (msg){
+      warnRow.style.display = "flex";
+      warnEl.textContent = msg;
+    } else {
+      warnRow.style.display = "none";
+      warnEl.textContent = "—";
+    }
+  }
+
+
+  $("closeTipBtn").onclick = () => hideTooltip();
+  tip.style.display = "block";
+}
+
+
+function hideTooltip(){
+  const tip = $("tooltip");
+  tip.style.display = "none";
+
+  // Reset link + warning so stale state doesn’t carry to next point
+  const linkEl = $("ttPdfLink");
+  if (linkEl){
+    linkEl.textContent = "—";
+    linkEl.removeAttribute("href");
+    linkEl.style.pointerEvents = "none";
+    linkEl.style.opacity = ".75";
+  }
+
+  const warnRow = $("ttWarnRow");
+  const warn = $("ttWarn");
+  if (warnRow) warnRow.style.display = "none";
+  if (warn) warn.textContent = "—";
+
+  const searchEl = $("ttSearch");
+  if (searchEl) searchEl.textContent = "—";
+
+    const openBtn = $("openPdfBtn");
+  if (openBtn){
+    openBtn.disabled = true;
+    openBtn.onclick = null;
+  }
+
+    // Native PDF + Copy Locator buttons removed from tooltip (no reset needed)
+
+
+  const progRow = $("ttProgramRow");
+  const progInfo = $("ttProgramInfo");
+  if (progRow) progRow.style.display = "none";
+  if (progInfo) progInfo.textContent = "";
+
+
+}
+
+
+
+function renderAudit(){
+  const box = $("auditBox");
+  const fund = getFund();
+  if (!fund){
+    box.textContent = "Select a loaded fund to view audit.";
+    return;
+  }
+  const a = fund._audit;
+  const mism = a.fundTotalMismatches || [];
+  const dep = a.coverage.departments;
+  const lin = a.coverage.lineItems;
+  const dShort = a.shortLived.departments;
+  const lShort = a.shortLived.lineItems;
+  const outs = a.outliers;
+
+  const html = [];
+  html.push(`<div><b>Detected schema:</b> <code>${a.schema.type}</code></div>`);
+  html.push(`<div><b>Fund total mismatches:</b> ${mism.length ? `<span class="bad">${mism.length}</span>` : `<span class="ok">none</span>`}</div>`);
+  if (mism.length){
+    html.push(`<div class="small">Example: ${mism[0].yy} diff ${formatMoney(mism[0].difference)}</div>`);
+  }
+  html.push(`<div><b>Coverage (Departments):</b> late ${dep.late.length}, early ${dep.early.length}, gaps ${dep.gaps.length}</div>`);
+  html.push(`<div><b>Coverage (Line items):</b> late ${lin.late.length}, early ${lin.early.length}, gaps ${lin.gaps.length}</div>`);
+  html.push(`<div><b>Short-lived &lt;5yr:</b> depts ${dShort.length}, line items ${lShort.length}</div>`);
+  html.push(`<div><b>Outliers flagged:</b> ${outs.length} (neighbor-based)</div>`);
+  html.push(`<div><b>Uncertainties:</b><br>${fund.uncertainties.map(u=>`• ${u}`).join("<br>")}</div>`);
+  box.innerHTML = html.join("<div style='height:8px'></div>");
+}
+
+function refreshUI(){
+  buildTopGroupTabs();
+  refreshFundSelect();
+  refreshProgramSelect();
+  refreshDeptSelect();
+    refreshLineSelect();
+  refreshChips();
+  renderFundWarning();
+
+  const fund = getFund();
+  if (!fund){
+    clearChart();
+    renderAudit();
+    return;
+  }
+
+
+    renderChart(fund);
+  renderAudit();
+  applyDetailLevelVisibility();
+}
+
+
+async function init(){
+  buildTopGroupTabs();
+
+  $("reloadBtn").onclick = async () => {
+    $("chartTitle").textContent = "Reloading…";
+    await loadAllFunds();
+    // auto-select first loaded fund matching top group if none selected
+    if (!state.fundId){
+      const candidates = Object.keys(dataStore.fundRegistry)
+        .filter(id => dataStore.fundRegistry[id].loaded)
+        .filter(id => (dataStore.fundRegistry[id].topGroupsExpected || []).includes(state.topGroup));
+      state.fundId = candidates[0] || Object.keys(dataStore.funds)[0] || null;
+    }
+    refreshUI();
+  };
+
+            $("resetBtn").onclick = () => {
+    state.fundId=null; state.programCode=null; state.deptCode=null; state.lineKey=null;
+    state.detailLevel = "basic";
+    state.showTrend = false;
+    state.showInflation = false;
+    state.showInflationPlusPopulation = false;
+
+    const trendEl = $("trendToggle");
+    if (trendEl) trendEl.checked = false;
+    const inflEl = $("inflationToggle");
+    if (inflEl) inflEl.checked = false;
+    const inflPopEl = $("inflationPopToggle");
+    if (inflPopEl) inflPopEl.checked = false;
+
+    // If radios exist, snap UI back to Basic
+    const basic = document.querySelector('input[name="detailLevel"][value="basic"]');
+
+    if (basic) basic.checked = true;
+
+    hideTooltip();
+    refreshUI();
+    applyDetailLevelVisibility();
+  };
+
+
+  // Radio setup (keeps toolbox minimal until user opts in)
+  setupDetailLevelRadios();
+    // Trend toggle (default OFF) — redraw chart without touching data
+  const trendEl = $("trendToggle");
+  if (trendEl && !trendEl._bound){
+    trendEl._bound = true;
+    trendEl.checked = !!state.showTrend;
+    trendEl.addEventListener("change", () => {
+      state.showTrend = !!trendEl.checked;
+      hideTooltip();
+      const fund = getFund();
+      if (fund) renderChart(fund);
+      else clearChart();
+    }, { passive:true });
+  }
+
+  // Inflation (CPI) overlay toggle — uses CPI-U, all items, annual averages
+  const inflEl = $("inflationToggle");
+  if (inflEl && !inflEl._bound){
+    inflEl._bound = true;
+    inflEl.checked = !!state.showInflation;
+    inflEl.addEventListener("change", () => {
+      state.showInflation = !!inflEl.checked;
+      hideTooltip();
+      const fund = getFund();
+      if (fund) renderChart(fund);
+      else clearChart();
+    }, { passive:true });
+  }
+
+  // Inflation + Population overlay toggle — CPI plus interpolated Moore County population growth
+  const inflPopEl = $("inflationPopToggle");
+  if (inflPopEl && !inflPopEl._bound){
+    inflPopEl._bound = true;
+    inflPopEl.checked = !!state.showInflationPlusPopulation;
+    inflPopEl.addEventListener("change", () => {
+      state.showInflationPlusPopulation = !!inflPopEl.checked;
+      hideTooltip();
+      const fund = getFund();
+      if (fund) renderChart(fund);
+      else clearChart();
+    }, { passive:true });
+  }
+
+  // Close tooltip when tapping anywhere outside it (mobile UX + avoids “stuck” tooltip)
+
+  const outsideClose = (ev) => {
+    const tip = $("tooltip");
+    if (tip.style.display !== "block") return;
+    if (tip.contains(ev.target)) return;
+    hideTooltip();
+  };
+  document.addEventListener("pointerdown", outsideClose, { passive:true });
+  document.addEventListener("touchstart", outsideClose, { passive:true });
+  document.addEventListener("mousedown", outsideClose, { passive:true });
+
+  // Desktop convenience
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape") hideTooltip();
+  });
+
+  await loadAllFunds();
+
+  // default select first loaded fund for current topGroup
+  const candidates = Object.keys(dataStore.fundRegistry)
+    .filter(id => dataStore.fundRegistry[id].loaded)
+    .filter(id => (dataStore.fundRegistry[id].topGroupsExpected || []).includes(state.topGroup));
+  state.fundId = candidates[0] || Object.keys(dataStore.funds)[0] || null;
+
+  refreshUI();
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+
+</body>
+</html>
