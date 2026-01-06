@@ -153,19 +153,8 @@ export default function App() {
         {currentPage === 'home' && (
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-5xl md:text-6xl font-black mb-6 text-gray-900 uppercase tracking-tight leading-none">Transparency Portal</h1>
-            <p className="text-gray-500 mb-8 text-xl max-w-2xl mx-auto">Access community financial records and participate in public oversight. Only verified voters can view detailed reports.</p>
+            <p className="text-gray-500 mb-16 text-xl max-w-2xl mx-auto">Access community financial records and participate in public oversight. Only verified voters can view detailed reports.</p>
             
-            {!user && (
-              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-                <button onClick={() => setCurrentPage('signup')} className="bg-indigo-600 text-white px-8 py-5 rounded-[2rem] font-black text-lg uppercase tracking-widest shadow-2xl hover:bg-indigo-700 transition-all transform hover:-translate-y-1">
-                   Join the Registry
-                </button>
-                <button onClick={() => setCurrentPage('login')} className="bg-white text-indigo-600 border-2 border-indigo-50 px-8 py-5 rounded-[2rem] font-black text-lg uppercase tracking-widest hover:bg-indigo-50 transition-all">
-                   Voter Login
-                </button>
-              </div>
-            )}
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {CATEGORIES.map(cat => (
                 <div key={cat.id} className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 hover:shadow-2xl transition-all cursor-pointer group text-left relative overflow-hidden">
