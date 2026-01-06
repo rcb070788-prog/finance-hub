@@ -27,11 +27,9 @@ export default function App() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Multi-select state
   const [selectedOfficials, setSelectedOfficials] = useState<string[]>([]);
   const [isOfficialDropdownOpen, setIsOfficialDropdownOpen] = useState(false);
 
-  // County Message Board State
   const [messages, setMessages] = useState([
     { 
       id: '1', 
@@ -104,6 +102,67 @@ export default function App() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsVerifying(true);
+    const formData = new FormData(e.currentTarget);
+    const lastName = formData.get('lastName') as string;
+    const voterId = formData.get('voterId') as string;
+    const dob = formData.get('dob') as string;
+    const address = formData.get('address') as string;
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+
+    try {
+      const verifyRes = await fetch('/.netlify/functions/verify-voter', {
+        method: 'POST',
+        body: JSON.stringify({ lastName, voterId, dob, address }),
+      });
+
+      const verifyData = await verifyRes.json();
+
+      if (!verifyRes.ok) {
+        throw new Error(verifyData.error || "Verification failed");
+      }
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: verifyData.fullName,
+            district: verifyData.district,
+            voter_id: voterId
+          }
+        }
+      });
+
+      if (error) throw error;
+      showToast("Verification Successful! Check your email for confirmation.", "success");
+    } catch (err: any) {
+      showToast(err.message, "error");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      showToast(err.message, "error");
+    }
+  };
+
   const handlePostMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || selectedOfficials.length === 0) {
@@ -115,7 +174,7 @@ export default function App() {
     
     const post = {
       id: Date.now().toString(),
-      user: isAnonymous ? 'Verified Voter' : (user.user_metadata?.full_name?.split(' ')[0] + ' ' + user.user_metadata?.full_name?.split(' ')[1][0] + '.'),
+      user: isAnonymous ? 'Verified Voter' : (user.user_metadata?.full_name?.split(' ')[0] + ' ' + (user.user_metadata?.full_name?.split(' ')[1]?.[0] || '') + '.'),
       district: user.user_metadata?.district || 'Member',
       to: addressedTo,
       text: newMessage,
@@ -124,70 +183,20 @@ export default function App() {
       response: null
     };
     
-    // NOTIFICATION LOGIC:
-    // This is where we trigger an email relay.
-    // We loop through selected officials, get their emails from constants.ts, and send a notification.
-    selectedOfficials.forEach(name => {
-      const official = OFFICIALS.find(o => o.name === name);
-      if (official?.email) {
-        console.log(`Relaying message to official: ${official.email}`);
-        // In a real production environment, this triggers a Netlify Function that sends an email.
-      }
-    });
+    // NOTE TO USER: This is a placeholder for the email service. 
+    // It will not send a real email until an API key for a service like SendGrid is added to the Back-End.
+    console.log("SIMULATED EMAIL RELAY TRIGGERED:", selectedOfficials.map(name => OFFICIALS.find(o => o.name === name)?.email).filter(Boolean));
 
     setMessages([post, ...messages]);
     setNewMessage('');
     setSelectedOfficials([]);
-    showToast("Message posted & officials notified via email!");
+    showToast("Message Posted! Notification Bridge Ready for Setup.", "success");
   };
 
   const toggleOfficial = (name: string) => {
     setSelectedOfficials(prev => 
       prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
     );
-  };
-
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const { error } = await supabase.auth.signInWithPassword({ 
-      email: formData.get('email') as string, 
-      password: formData.get('password') as string 
-    });
-    if (error) showToast(error.message, "error");
-    else setCurrentPage('home');
-  };
-
-  const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsVerifying(true);
-    const formData = new FormData(e.currentTarget);
-    try {
-      const verifyRes = await fetch('/.netlify/functions/verify-voter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          lastName: (formData.get('lastName') as string).toUpperCase(), 
-          voterId: formData.get('voterId') as string, 
-          dob: formData.get('dob') as string, 
-          address: (formData.get('address') as string).toUpperCase() 
-        })
-      });
-      const verifyData = await verifyRes.json();
-      if (!verifyRes.ok) throw new Error(verifyData.error);
-      const { error: signUpError } = await supabase.auth.signUp({
-        email: formData.get('email') as string,
-        password: formData.get('password') as string,
-        options: { data: { full_name: verifyData.fullName, voter_id: formData.get('voterId'), district: verifyData.district } }
-      });
-      if (signUpError) throw signUpError;
-      showToast("Verification Sent! Check your email.", "success");
-      setCurrentPage('login');
-    } catch (err: any) {
-      showToast(err.message, "error");
-    } finally {
-      setIsVerifying(false);
-    }
   };
 
   const goHome = () => {
@@ -226,7 +235,7 @@ export default function App() {
               setCurrentPage('board');
               setSelectedCategory(null);
             }} 
-            className={`flex items-center text-xl font-bold tracking-tight transition-all py-1 px-2 border-b-4 rounded-t-sm ${currentPage === 'board' ? 'text-black border-indigo-600' : 'text-gray-400 border-transparent hover:text-black'}`}
+            className={`flex items-center text-xl font-bold tracking-tight transition-all py-1 px-2 border-b-4 rounded-t-sm ${currentPage === 'board' ? 'text-gray-900 border-indigo-600' : 'text-gray-400 border-transparent hover:text-gray-900'}`}
           >
             <i className="fa-solid fa-envelope mr-3 text-lg"></i>
             Let's Talk
@@ -319,7 +328,7 @@ export default function App() {
                   <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 text-xs"></i>
                   <input 
                     type="text" 
-                    placeholder="Search who, what..." 
+                    placeholder="Search history..." 
                     className="w-full pl-10 pr-4 py-3 bg-white rounded-xl text-xs font-bold border border-transparent focus:border-indigo-200 outline-none transition-all shadow-sm"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -372,35 +381,52 @@ export default function App() {
                               <button 
                                 type="button"
                                 onClick={() => setIsOfficialDropdownOpen(!isOfficialDropdownOpen)}
-                                className="w-full bg-gray-50 p-4 rounded-2xl flex justify-between items-center text-sm font-bold text-gray-700 border-2 border-transparent focus:border-indigo-100 transition-all"
+                                className="w-full bg-gray-50 p-4 rounded-2xl flex justify-between items-center text-sm font-bold text-gray-700 border-2 border-transparent focus:border-indigo-100 transition-all shadow-inner"
                               >
-                                <span>{selectedOfficials.length === 0 ? '-- Choose Officials --' : `${selectedOfficials.length} Selected`}</span>
-                                <i className={`fa-solid fa-chevron-${isOfficialDropdownOpen ? 'up' : 'down'} text-xs text-indigo-300`}></i>
+                                <div className="flex items-center gap-3">
+                                   <i className="fa-solid fa-users-rectangle text-indigo-400"></i>
+                                   <span>{selectedOfficials.length === 0 ? '-- Choose Officials --' : `${selectedOfficials.length} Selected`}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                   {isOfficialDropdownOpen && <span className="text-[8px] font-black uppercase text-indigo-500 animate-pulse">Click to close list</span>}
+                                   <i className={`fa-solid fa-chevron-${isOfficialDropdownOpen ? 'up' : 'down'} text-xs text-indigo-300`}></i>
+                                </div>
                               </button>
                               
                               {isOfficialDropdownOpen && (
-                                <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[60] max-h-60 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-                                  {['Courthouse', 'Non-Courthouse', 'Council Members'].map(cat => (
-                                    <div key={cat} className="space-y-2">
-                                      <h4 className="text-[8px] font-black uppercase text-gray-300 tracking-widest px-2">{cat}</h4>
-                                      <div className="grid grid-cols-1 gap-1">
-                                        {OFFICIALS.filter(o => o.category === cat).map(o => (
-                                          <label key={o.id} className="flex items-center gap-3 p-2 hover:bg-indigo-50 rounded-xl cursor-pointer group transition-colors">
-                                            <input 
-                                              type="checkbox" 
-                                              className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" 
-                                              checked={selectedOfficials.includes(o.name)}
-                                              onChange={() => toggleOfficial(o.name)}
-                                            />
-                                            <div className="flex flex-col">
-                                              <span className="text-[10px] font-black text-gray-800 group-hover:text-indigo-900 uppercase">{o.name}</span>
-                                              <span className="text-[8px] font-bold text-gray-400">{o.office} {o.district ? `(Dist ${o.district})` : ''}</span>
-                                            </div>
-                                          </label>
-                                        ))}
+                                <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-gray-100 z-[60] max-h-96 flex flex-col overflow-hidden">
+                                  <div className="flex-grow overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                                    {['Courthouse', 'Non-Courthouse', 'Council Members'].map(cat => (
+                                      <div key={cat} className="space-y-2">
+                                        <h4 className="text-[8px] font-black uppercase text-indigo-300 tracking-[0.2em] px-2">{cat}</h4>
+                                        <div className="grid grid-cols-1 gap-1">
+                                          {OFFICIALS.filter(o => o.category === cat).map(o => (
+                                            <label key={o.id} className="flex items-center gap-3 p-3 hover:bg-indigo-50 rounded-2xl cursor-pointer group transition-colors">
+                                              <input 
+                                                type="checkbox" 
+                                                className="w-5 h-5 rounded-lg border-gray-200 text-indigo-600 focus:ring-indigo-500 transition-all cursor-pointer" 
+                                                checked={selectedOfficials.includes(o.name)}
+                                                onChange={() => toggleOfficial(o.name)}
+                                              />
+                                              <div className="flex flex-col">
+                                                <span className="text-[10px] font-black text-gray-800 group-hover:text-indigo-900 uppercase tracking-tight">{o.name}</span>
+                                                <span className="text-[8px] font-bold text-gray-400">{o.office} {o.district ? `(Dist ${o.district})` : ''}</span>
+                                              </div>
+                                            </label>
+                                          ))}
+                                        </div>
                                       </div>
-                                    </div>
-                                  ))}
+                                    ))}
+                                  </div>
+                                  <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-center">
+                                     <button 
+                                       type="button" 
+                                       onClick={() => setIsOfficialDropdownOpen(false)}
+                                       className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-indigo-700 transition-all"
+                                     >
+                                       Done Selecting ({selectedOfficials.length})
+                                     </button>
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -412,7 +438,7 @@ export default function App() {
                               value={newMessage}
                               onChange={(e) => setNewMessage(e.target.value)}
                               placeholder="Describe your inquiry clearly for the official public record..." 
-                              className="w-full h-32 bg-gray-50 rounded-3xl p-6 outline-none resize-none font-bold text-gray-700 placeholder:text-gray-300 border-2 border-transparent focus:border-indigo-100 transition-all"
+                              className="w-full h-32 bg-gray-50 rounded-3xl p-6 outline-none resize-none font-bold text-gray-700 placeholder:text-gray-300 border-2 border-transparent focus:border-indigo-100 transition-all shadow-inner"
                             />
                           </div>
 
@@ -532,11 +558,11 @@ export default function App() {
         .custom-scrollbar::-webkit-scrollbar { width: 14px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f8fafc; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { 
-          background: #94a3b8; 
+          background: #334155; 
           border-radius: 10px; 
           border: 4px solid #f8fafc;
         }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #1e293b; }
       `}</style>
     </div>
   );
