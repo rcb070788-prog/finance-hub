@@ -10,16 +10,31 @@ export const CATEGORIES = [
 
 /**
  * CONFIGURATION: Add your new dashboards here!
- * Just drop the folder into your 'public/dashboards/' folder
- * and add a new entry below.
  */
-export const DASHBOARDS: DashboardConfig[] = [
+export const DASHBOARDS: (DashboardConfig & { status?: string })[] = [
   {
     id: 'expenses-by-fund',
     category: 'expenses',
-    title: 'Expenses by Fund',
-    description: 'A detailed breakdown of community spending across various public funds including CSV data and fiscal reports.',
-    folderPath: '/dashboards/expensesbyfund/index.html'
+    title: 'General Fund Spending',
+    description: 'A detailed breakdown of community spending across various public funds including CSV data.',
+    folderPath: '/dashboards/expensesbyfund/index.html',
+    status: 'Live'
+  },
+  {
+    id: 'education-budget',
+    category: 'expenses',
+    title: 'School District Allocation',
+    description: 'Transparency report on how local taxes are being used for school infrastructure and staffing.',
+    folderPath: '/dashboards/education/index.html',
+    status: 'Updated Today'
+  },
+  {
+    id: 'property-tax-revenue',
+    category: 'revenues',
+    title: 'Property Tax Collection',
+    description: 'Visualization of tax revenue trends over the last 10 years for our district.',
+    folderPath: '/dashboards/property-tax/index.html',
+    status: 'Official'
   }
 ];
 
