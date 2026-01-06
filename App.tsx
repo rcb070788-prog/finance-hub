@@ -53,15 +53,10 @@ export default function App() {
       setUser(newUser);
       
       if (event === 'SIGNED_IN') {
-        // If they just confirmed their email, they land here automatically
         showToast("Access Granted! Identity Confirmed.", "success");
         setCurrentPage('home');
       }
       
-      if (event === 'USER_UPDATED') {
-        showToast("Profile Updated", "success");
-      }
-
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setCurrentPage('home');
@@ -159,7 +154,7 @@ export default function App() {
       <div className="fixed inset-0 z-[100] bg-white flex flex-col font-sans overflow-hidden">
         {toast && <Toast message={toast.message} type={toast.type} />}
         
-        {/* Floating Close Button - Highly Compact for Mobile */}
+        {/* Floating Close Button - Compact for Mobile */}
         <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-[110]">
           <button 
             onClick={() => setActiveDashboard(null)} 
@@ -195,10 +190,10 @@ export default function App() {
               <button onClick={handleLogout} className="text-[9px] font-black uppercase text-red-500 border border-red-100 px-2 py-1.5 rounded-lg hover:bg-red-50 transition">Logout</button>
             </div>
           ) : (
-            <>
-              <button onClick={() => setCurrentPage('login')} className="text-gray-600 px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest hover:bg-gray-100 transition">Login</button>
-              <button onClick={() => setCurrentPage('signup')} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition shadow-md">Register</button>
-            </>
+            <div className="flex gap-1 sm:gap-2 items-center">
+              <button onClick={() => setCurrentPage('login')} className="text-gray-600 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg font-black text-[9px] sm:text-[10px] uppercase tracking-widest hover:bg-gray-100 transition">Login</button>
+              <button onClick={() => setCurrentPage('signup')} className="bg-indigo-600 text-white px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg font-black text-[9px] sm:text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition shadow-md">Register</button>
+            </div>
           )}
         </div>
       </nav>
@@ -207,8 +202,11 @@ export default function App() {
         {currentPage === 'home' && !selectedCategory && (
           <div className="max-w-5xl mx-auto w-full h-full flex flex-col justify-center">
             <header className="mb-6 text-center">
-              <h1 className="text-3xl md:text-5xl font-black mb-2 text-gray-900 uppercase tracking-tight leading-none">Transparency Portal</h1>
-              <p className="text-gray-500 text-base md:text-lg max-w-2xl mx-auto">Verified voter access to financial records and community oversight.</p>
+              <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest mb-4">
+                <i className="fa-solid fa-globe"></i> Public Transparency Portal
+              </div>
+              <h1 className="text-3xl md:text-5xl font-black mb-2 text-gray-900 uppercase tracking-tight leading-none">Open Finance</h1>
+              <p className="text-gray-500 text-base md:text-lg max-w-2xl mx-auto">Access real-time community spending and financial oversight reports.</p>
             </header>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
@@ -223,7 +221,7 @@ export default function App() {
                   </div>
                   <div className="relative z-10">
                     <h3 className="text-lg font-black text-gray-800 mb-1 uppercase tracking-tight">{cat.label}</h3>
-                    <p className="text-gray-400 text-sm leading-snug">Click to view all {cat.label.toLowerCase()} reports and live data.</p>
+                    <p className="text-gray-400 text-sm leading-snug">Public records for community {cat.label.toLowerCase()}.</p>
                   </div>
                 </div>
               ))}
@@ -242,38 +240,46 @@ export default function App() {
              </div>
 
              <div className="flex-grow overflow-hidden flex flex-col">
-                <h2 className="text-3xl font-black mb-6 text-gray-900 uppercase shrink-0">{selectedCategory} Reports</h2>
+                <div className="flex justify-between items-end mb-6 shrink-0">
+                  <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter">{selectedCategory} Reports</h2>
+                  <div className="hidden sm:flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-xl border border-gray-200">
+                    <i className={`fa-solid ${user ? 'fa-user-check text-green-500' : 'fa-eye text-indigo-500'} text-xs`}></i>
+                    <span className="text-[9px] font-black uppercase text-gray-500 tracking-widest">
+                      {user ? 'Verified View' : 'Public View'}
+                    </span>
+                  </div>
+                </div>
                 
-                {!user ? (
-                   <div className="bg-white p-12 rounded-[3rem] shadow-xl text-center flex-grow flex flex-col justify-center items-center">
-                      <div className="w-20 h-20 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mb-6 text-3xl">
-                        <i className="fa-solid fa-lock"></i>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pb-8">
+                  {DASHBOARDS.filter(d => d.category === selectedCategory).length > 0 ? (
+                    DASHBOARDS.filter(d => d.category === selectedCategory).map(dash => (
+                      <div key={dash.id} onClick={() => setActiveDashboard(dash)} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 hover:shadow-xl transition-all cursor-pointer group relative overflow-hidden">
+                         <div className="flex justify-between items-start mb-4">
+                           <span className="text-[8px] font-black uppercase tracking-widest bg-gray-50 text-gray-400 px-2 py-1 rounded-lg border border-gray-100">Official Report</span>
+                           {user && <i className="fa-solid fa-circle-check text-green-500 text-xs" title="Verified Member Access"></i>}
+                         </div>
+                         <h4 className="text-xl font-black text-gray-800 mb-3 uppercase tracking-tight group-hover:text-indigo-600 transition-colors leading-none">{dash.title}</h4>
+                         <p className="text-gray-400 text-sm leading-relaxed mb-6">{dash.description}</p>
+                         <span className="text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
+                           View Data <i className="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                         </span>
                       </div>
-                      <h3 className="text-2xl font-black mb-2 text-gray-800">Verified Access Only</h3>
-                      <p className="text-gray-500 mb-8 max-w-sm">Detailed financial records are restricted to registered voters. Please login or register to continue.</p>
-                      <div className="flex gap-4">
-                        <button onClick={() => setCurrentPage('login')} className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg">Login</button>
-                        <button onClick={() => setCurrentPage('signup')} className="border-2 border-indigo-50 text-indigo-600 px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest">Register</button>
-                      </div>
-                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pb-8">
-                    {DASHBOARDS.filter(d => d.category === selectedCategory).length > 0 ? (
-                      DASHBOARDS.filter(d => d.category === selectedCategory).map(dash => (
-                        <div key={dash.id} onClick={() => setActiveDashboard(dash)} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 hover:shadow-xl transition-all cursor-pointer group">
-                           <h4 className="text-xl font-black text-gray-800 mb-3 uppercase tracking-tight group-hover:text-indigo-600 transition-colors">{dash.title}</h4>
-                           <p className="text-gray-400 text-sm leading-relaxed mb-6">{dash.description}</p>
-                           <span className="text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
-                             Launch Dashboard <i className="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
-                           </span>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="col-span-full py-20 text-center bg-gray-100 rounded-[3rem] border-2 border-dashed border-gray-200">
-                         <i className="fa-solid fa-folder-open text-4xl text-gray-300 mb-4"></i>
-                         <p className="text-gray-400 font-bold uppercase text-xs tracking-widest">No reports currently available in this category</p>
-                      </div>
-                    )}
+                    ))
+                  ) : (
+                    <div className="col-span-full py-20 text-center bg-gray-100 rounded-[3rem] border-2 border-dashed border-gray-200">
+                       <i className="fa-solid fa-folder-open text-4xl text-gray-300 mb-4"></i>
+                       <p className="text-gray-400 font-bold uppercase text-xs tracking-widest">No reports currently available in this category</p>
+                    </div>
+                  )}
+                </div>
+
+                {!user && (
+                  <div className="mt-4 p-6 bg-indigo-50 rounded-[2rem] border border-indigo-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="text-center sm:text-left">
+                      <p className="text-indigo-900 font-black text-sm uppercase tracking-tight">Want to participate in the conversation?</p>
+                      <p className="text-indigo-500 text-xs">Login as a verified voter to comment or vote on these reports.</p>
+                    </div>
+                    <button onClick={() => setCurrentPage('signup')} className="bg-white text-indigo-600 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:shadow-md transition-all shrink-0">Register Now</button>
                   </div>
                 )}
              </div>
