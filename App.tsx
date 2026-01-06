@@ -76,7 +76,6 @@ export default function App() {
     setIsVerifying(true);
     
     const formData = new FormData(e.currentTarget);
-    // We convert everything to UPPERCASE here to match the CSV perfectly
     const lastName = (formData.get('lastName') as string).toUpperCase();
     const voterId = formData.get('voterId') as string;
     const dob = formData.get('dob') as string;
@@ -111,7 +110,7 @@ export default function App() {
 
       if (signUpError) throw signUpError;
 
-      showToast("Verification Successful! Check your email for a confirmation link.", "success");
+      showToast("Identity Verified! Please check your email to confirm.", "success");
       setCurrentPage('login');
     } catch (err: any) {
       showToast(err.message, "error");
@@ -133,16 +132,19 @@ export default function App() {
       <nav className="bg-white shadow-sm px-6 py-4 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center cursor-pointer" onClick={() => setCurrentPage('home')}>
           <i className="fa-solid fa-landmark text-indigo-600 text-2xl mr-2"></i>
-          <span className="text-xl font-bold text-gray-800">Community Finance</span>
+          <span className="text-xl font-bold text-gray-800 tracking-tight">Community Finance Hub</span>
         </div>
-        <div className="flex gap-4 items-center">
+        <div className="flex gap-3 items-center">
           {user ? (
             <div className="flex items-center gap-4">
-              <span className="text-sm font-medium text-gray-600">Hi, {user.user_metadata?.full_name?.split(' ')[0]}</span>
-              <button onClick={handleLogout} className="text-sm text-red-500 hover:underline">Logout</button>
+              <span className="text-sm font-black text-gray-600 uppercase tracking-tighter">Hi, {user.user_metadata?.full_name?.split(' ')[0]}</span>
+              <button onClick={handleLogout} className="text-[10px] font-black uppercase text-red-500 border border-red-100 px-3 py-2 rounded-xl hover:bg-red-50 transition">Logout</button>
             </div>
           ) : (
-            <button onClick={() => setCurrentPage('login')} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700 transition">Voter Login</button>
+            <>
+              <button onClick={() => setCurrentPage('login')} className="text-gray-600 px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-gray-100 transition">Login</button>
+              <button onClick={() => setCurrentPage('signup')} className="bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition shadow-lg">Register</button>
+            </>
           )}
         </div>
       </nav>
@@ -150,16 +152,29 @@ export default function App() {
       <main className="flex-grow container mx-auto px-4 py-8">
         {currentPage === 'home' && (
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl font-black mb-4 text-gray-900 uppercase tracking-tight">Transparency Portal</h1>
-            <p className="text-gray-500 mb-12 text-lg">Open access to community financial records.</p>
+            <h1 className="text-5xl md:text-6xl font-black mb-6 text-gray-900 uppercase tracking-tight leading-none">Transparency Portal</h1>
+            <p className="text-gray-500 mb-8 text-xl max-w-2xl mx-auto">Access community financial records and participate in public oversight. Only verified voters can view detailed reports.</p>
+            
+            {!user && (
+              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+                <button onClick={() => setCurrentPage('signup')} className="bg-indigo-600 text-white px-8 py-5 rounded-[2rem] font-black text-lg uppercase tracking-widest shadow-2xl hover:bg-indigo-700 transition-all transform hover:-translate-y-1">
+                   Join the Registry
+                </button>
+                <button onClick={() => setCurrentPage('login')} className="bg-white text-indigo-600 border-2 border-indigo-50 px-8 py-5 rounded-[2rem] font-black text-lg uppercase tracking-widest hover:bg-indigo-50 transition-all">
+                   Voter Login
+                </button>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {CATEGORIES.map(cat => (
-                <div key={cat.id} className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 hover:shadow-2xl transition-all cursor-pointer group text-left">
-                  <div className={`${cat.color} w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg`}>
-                    <i className={`fa-solid ${cat.icon} text-2xl`}></i>
+                <div key={cat.id} className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 hover:shadow-2xl transition-all cursor-pointer group text-left relative overflow-hidden">
+                   <div className={`${cat.color} opacity-5 absolute -right-4 -top-4 w-32 h-32 rounded-full transform scale-150`}></div>
+                  <div className={`${cat.color} w-16 h-16 rounded-3xl flex items-center justify-center text-white mb-8 shadow-xl relative z-10`}>
+                    <i className={`fa-solid ${cat.icon} text-3xl`}></i>
                   </div>
-                  <h3 className="text-2xl font-black text-gray-800 mb-2">{cat.label}</h3>
-                  <p className="text-gray-400 text-sm leading-relaxed">Analyze spending and view audits for full accountability.</p>
+                  <h3 className="text-2xl font-black text-gray-800 mb-3 relative z-10 uppercase tracking-tight">{cat.label}</h3>
+                  <p className="text-gray-400 text-sm leading-relaxed relative z-10">Detailed reports and real-time ledger data for community oversight.</p>
                 </div>
               ))}
             </div>
@@ -167,83 +182,87 @@ export default function App() {
         )}
 
         {currentPage === 'signup' && (
-          <div className="max-w-xl mx-auto bg-white p-10 rounded-3xl shadow-2xl border border-gray-100">
-            <h2 className="text-3xl font-black text-center mb-2 text-gray-900 uppercase">Voter Registry</h2>
-            <p className="text-center text-gray-400 mb-10 text-sm px-4">All entries must match your official voter registration exactly.</p>
-            
-            <form className="space-y-6" onSubmit={handleSignup}>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Last Name</label>
-                  <input 
-                    name="lastName" 
-                    required 
-                    placeholder="SMITH" 
-                    className="w-full p-4 bg-gray-50 rounded-xl border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none font-bold uppercase" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Voter ID #</label>
-                  <input name="voterId" required placeholder="12345678" className="w-full p-4 bg-gray-50 rounded-xl border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none font-bold" />
-                </div>
-              </div>
+          <div className="max-w-xl mx-auto">
+            <div className="flex gap-2 mb-6 bg-gray-100 p-2 rounded-[2rem]">
+              <button onClick={() => setCurrentPage('signup')} className="flex-1 py-3 rounded-[1.5rem] font-black text-xs uppercase tracking-widest bg-white shadow-sm text-indigo-600">1. Register</button>
+              <button onClick={() => setCurrentPage('login')} className="flex-1 py-3 rounded-[1.5rem] font-black text-xs uppercase tracking-widest text-gray-400 hover:text-gray-600 transition">2. Login</button>
+            </div>
 
-              <div className="p-6 bg-indigo-50 rounded-3xl border border-indigo-100 relative">
-                <p className="text-[10px] font-black text-indigo-900 mb-4 uppercase tracking-widest flex items-center gap-2">
-                  Verification (Complete One)
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[9px] font-black text-indigo-400 mb-1 uppercase tracking-tighter">Date of Birth</label>
-                    <input type="date" name="dob" className="w-full p-3 bg-white rounded-xl border-0 shadow-sm text-sm font-bold" />
-                  </div>
-                  <div>
-                    <label className="block text-[9px] font-black text-indigo-400 mb-1 uppercase tracking-tighter">Street Address</label>
-                    <input 
-                      name="address" 
-                      placeholder="123 MAIN ST" 
-                      className="w-full p-3 bg-white rounded-xl border-0 shadow-sm text-sm font-bold uppercase" 
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-6 border-t border-gray-100">
-                <div className="mb-4">
-                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Email Address</label>
-                  <input type="email" name="email" required placeholder="you@example.com" className="w-full p-4 bg-gray-50 rounded-xl border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none font-bold" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Choose Password</label>
-                  <input type="password" name="password" required placeholder="Min. 6 characters" className="w-full p-4 bg-gray-50 rounded-xl border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none font-bold" />
-                </div>
-              </div>
+            <div className="bg-white p-12 rounded-[3rem] shadow-2xl border border-gray-100">
+              <h2 className="text-3xl font-black text-center mb-2 text-gray-900 uppercase tracking-tighter">New Voter Registry</h2>
+              <p className="text-center text-gray-400 mb-10 text-[10px] uppercase font-bold tracking-widest px-4">All entries must match official records exactly</p>
               
-              <button 
-                disabled={isVerifying}
-                className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-xl hover:bg-indigo-700 disabled:bg-indigo-300 transition-all flex items-center justify-center gap-3 transform hover:-translate-y-1"
-              >
-                {isVerifying ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-user-plus"></i>}
-                {isVerifying ? 'Checking Records...' : 'Register & Verify'}
-              </button>
-            </form>
+              <form className="space-y-6" onSubmit={handleSignup}>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Last Name</label>
+                    <input name="lastName" required placeholder="E.G. SMITH" className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none font-bold uppercase" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Voter ID #</label>
+                    <input name="voterId" required placeholder="12345678" className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none font-bold" />
+                  </div>
+                </div>
+
+                <div className="p-8 bg-indigo-50 rounded-[2rem] border border-indigo-100">
+                  <p className="text-[10px] font-black text-indigo-900 mb-6 uppercase tracking-widest">Verification Check</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[9px] font-black text-indigo-400 mb-2 uppercase tracking-tighter">Date of Birth</label>
+                      <input type="date" name="dob" className="w-full p-4 bg-white rounded-xl border-0 shadow-sm text-sm font-bold" />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-black text-indigo-400 mb-2 uppercase tracking-tighter">Street Address</label>
+                      <input name="address" placeholder="123 MAIN ST" className="w-full p-4 bg-white rounded-xl border-0 shadow-sm text-sm font-bold uppercase" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-8 border-t border-gray-100 space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Choose Login Email</label>
+                    <input type="email" name="email" required placeholder="name@email.com" className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none font-bold" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Choose Password</label>
+                    <input type="password" name="password" required placeholder="••••••••" className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none font-bold" />
+                  </div>
+                </div>
+                
+                <button disabled={isVerifying} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-xl hover:bg-indigo-700 disabled:bg-indigo-300 transition-all flex items-center justify-center gap-3 transform hover:-translate-y-1">
+                  {isVerifying ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-user-shield"></i>}
+                  {isVerifying ? 'Verifying Records...' : 'Verify & Register'}
+                </button>
+              </form>
+            </div>
           </div>
         )}
 
         {currentPage === 'login' && (
-          <div className="max-w-md mx-auto bg-white p-12 rounded-3xl shadow-2xl border border-gray-100">
-            <h2 className="text-3xl font-black text-center mb-8 text-gray-900 tracking-tight">Voter Login</h2>
-            <form className="space-y-4" onSubmit={handleLogin}>
-              <input name="email" type="email" placeholder="Email Address" required className="w-full p-4 bg-gray-50 rounded-xl border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none font-bold" />
-              <input name="password" type="password" placeholder="Password" required className="w-full p-4 bg-gray-50 rounded-xl border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none font-bold" />
-              <button className="w-full bg-indigo-600 text-white py-5 rounded-xl font-black text-lg hover:bg-indigo-700 shadow-lg transition-all transform hover:-translate-y-1">Sign In</button>
-            </form>
+          <div className="max-w-md mx-auto">
+            <div className="flex gap-2 mb-6 bg-gray-100 p-2 rounded-[2rem]">
+              <button onClick={() => setCurrentPage('signup')} className="flex-1 py-3 rounded-[1.5rem] font-black text-xs uppercase tracking-widest text-gray-400 hover:text-gray-600 transition">1. Register</button>
+              <button onClick={() => setCurrentPage('login')} className="flex-1 py-3 rounded-[1.5rem] font-black text-xs uppercase tracking-widest bg-white shadow-sm text-indigo-600">2. Login</button>
+            </div>
+
+            <div className="bg-white p-12 rounded-[3rem] shadow-2xl border border-gray-100">
+              <h2 className="text-3xl font-black text-center mb-8 text-gray-900 tracking-tighter uppercase">Voter Login</h2>
+              <form className="space-y-4" onSubmit={handleLogin}>
+                <input name="email" type="email" placeholder="Email Address" required className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none font-bold" />
+                <input name="password" type="password" placeholder="Password" required className="w-full p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all outline-none font-bold" />
+                <button className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-lg hover:bg-indigo-700 shadow-xl transition-all transform hover:-translate-y-1">Sign In</button>
+              </form>
+              <div className="mt-8 text-center pt-6 border-t border-gray-50">
+                 <p className="text-gray-400 text-[10px] font-black uppercase mb-4 tracking-widest">New to the platform?</p>
+                 <button onClick={() => setCurrentPage('signup')} className="w-full border-2 border-indigo-50 text-indigo-600 py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-50 transition-all">Start Registration</button>
+              </div>
+            </div>
           </div>
         )}
       </main>
 
-      <footer className="bg-gray-900 text-indigo-200 p-12 mt-20 text-center">
-        <p className="text-xs text-indigo-400">© 2024 Concerned Citizens Hub. Records are formatted in ALL CAPS to match official municipal data.</p>
+      <footer className="bg-white border-t border-gray-100 p-12 mt-20 text-center">
+        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">© 2024 Community Finance Hub • Verified Identity Platform</p>
       </footer>
     </div>
   );
