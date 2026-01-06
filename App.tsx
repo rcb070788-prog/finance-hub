@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { CATEGORIES, DASHBOARDS, OFFICIALS } from './constants.ts';
 import { DashboardConfig } from './types.ts';
@@ -25,6 +25,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // County Message Board State
   const [messages, setMessages] = useState([
@@ -35,6 +36,7 @@ export default function App() {
       to: 'Mayor Sloan Stewart', 
       text: 'What is the timeline for the new courthouse roof repairs?', 
       isAnonymous: false,
+      date: 'Oct 24, 2024',
       response: { author: 'Mayor Sloan Stewart', text: 'We have approved the contractor, work begins next Monday.', date: '2 hours ago' }
     },
     { 
@@ -44,10 +46,33 @@ export default function App() {
       to: 'Robert Bracewell', 
       text: 'Thank you for looking into the District 2 drainage issues.', 
       isAnonymous: true,
+      date: 'Oct 23, 2024',
       response: null
+    },
+    { 
+      id: '3', 
+      user: 'Mike R.', 
+      district: 'Dist 1', 
+      to: 'Lacy Ivey', 
+      text: 'Are vehicle registration renewals available online yet?', 
+      isAnonymous: false,
+      date: 'Oct 20, 2024',
+      response: { author: 'Lacy Ivey', text: 'Yes, visit our portal under the Revenues section.', date: '1 day ago' }
     }
   ]);
   
+  // Filtered messages based on search
+  const filteredMessages = useMemo(() => {
+    if (!searchQuery) return messages;
+    const q = searchQuery.toLowerCase();
+    return messages.filter(m => 
+      m.user.toLowerCase().includes(q) || 
+      m.to.toLowerCase().includes(q) || 
+      m.text.toLowerCase().includes(q) ||
+      (m.response?.author.toLowerCase().includes(q))
+    );
+  }, [messages, searchQuery]);
+
   // New Message Form State
   const [newMessage, setNewMessage] = useState('');
   const [targetOfficial, setTargetOfficial] = useState('');
@@ -104,6 +129,7 @@ export default function App() {
       to: targetOfficial,
       text: newMessage,
       isAnonymous,
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       response: null
     };
     
@@ -187,19 +213,20 @@ export default function App() {
     <div className="h-screen bg-gray-50 flex flex-col font-sans overflow-hidden relative">
       {toast && <Toast message={toast.message} type={toast.type} />}
       
-      <nav className="bg-white shadow-sm px-6 py-3 flex justify-between items-center z-50 shrink-0">
-        <div className="flex items-center gap-6">
+      <nav className="bg-white shadow-sm px-6 py-3 flex justify-between items-center z-50 shrink-0 border-b border-gray-100">
+        <div className="flex items-center gap-10">
           <div className="flex items-center cursor-pointer" onClick={goHome}>
-            <i className="fa-solid fa-landmark text-indigo-600 text-xl mr-2"></i>
-            <span className="text-lg font-bold text-gray-800 tracking-tight">County Finance Hub</span>
+            <i className="fa-solid fa-landmark text-indigo-600 text-2xl mr-3"></i>
+            <span className="text-xl font-bold text-gray-900 tracking-tight">County Finance Hub</span>
           </div>
           <button 
             onClick={() => {
               setCurrentPage('board');
               setSelectedCategory(null);
             }} 
-            className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors py-2 px-1 border-b-2 ${currentPage === 'board' ? 'text-indigo-600 border-indigo-600' : 'text-gray-400 border-transparent hover:text-indigo-600'}`}
+            className={`flex items-center text-xl font-bold tracking-tight transition-all py-1 px-2 border-b-4 rounded-t-sm ${currentPage === 'board' ? 'text-indigo-600 border-indigo-600' : 'text-gray-400 border-transparent hover:text-indigo-600'}`}
           >
+            <i className="fa-solid fa-envelope mr-3 text-lg"></i>
             Let's Talk
           </button>
         </div>
@@ -281,131 +308,181 @@ export default function App() {
         )}
 
         {currentPage === 'board' && (
-          <div className="flex flex-col h-full overflow-hidden items-center">
-             <div className="w-full max-w-4xl flex-grow overflow-y-auto space-y-12 pb-12 pr-2 custom-scrollbar">
-                <section>
-                  <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-3">
-                      <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter">County Message Board</h2>
-                      <span className="bg-indigo-600 text-white text-[8px] font-black uppercase px-2 py-1 rounded-full">Public Record</span>
+          <div className="flex h-full gap-8 overflow-hidden pb-8">
+            {/* ARCHIVE SIDEBAR */}
+            <aside className="w-80 flex flex-col bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden shrink-0">
+              <div className="p-6 border-b border-gray-50 bg-indigo-50/30">
+                <h2 className="text-sm font-black uppercase tracking-widest text-indigo-900 mb-4 flex items-center gap-2">
+                  <i className="fa-solid fa-box-archive"></i> Message Archive
+                </h2>
+                <div className="relative">
+                  <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 text-xs"></i>
+                  <input 
+                    type="text" 
+                    placeholder="Search who, what..." 
+                    className="w-full pl-10 pr-4 py-3 bg-white rounded-xl text-xs font-bold border border-transparent focus:border-indigo-200 outline-none transition-all shadow-sm"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex-grow overflow-y-auto p-4 custom-scrollbar space-y-3">
+                {filteredMessages.length > 0 ? filteredMessages.map(msg => (
+                  <div 
+                    key={`archive-${msg.id}`} 
+                    className="p-4 rounded-2xl hover:bg-gray-50 transition-colors cursor-pointer border border-transparent hover:border-indigo-50 group"
+                    onClick={() => {
+                      const el = document.getElementById(`msg-${msg.id}`);
+                      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }}
+                  >
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[9px] font-black uppercase text-indigo-600">{msg.to}</span>
+                      <span className="text-[7px] font-bold text-gray-300">{msg.date}</span>
+                    </div>
+                    <p className="text-[10px] font-medium text-gray-500 line-clamp-1 italic">"{msg.text}"</p>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[8px] font-black text-gray-800 uppercase">{msg.user}</span>
+                      {msg.response && <i className="fa-solid fa-circle-check text-[8px] text-green-500"></i>}
                     </div>
                   </div>
-                  
-                  {user && (
-                    <div className="mb-12 bg-white p-8 rounded-[3rem] shadow-xl border border-gray-100">
-                       <h3 className="text-sm font-black uppercase text-indigo-600 mb-6 flex items-center gap-2">
-                         <i className="fa-solid fa-envelope-circle-check"></i> Contact Your Elected Officials
-                       </h3>
-                       <form onSubmit={handlePostMessage} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                )) : (
+                  <div className="text-center py-10">
+                    <i className="fa-solid fa-ghost text-gray-200 text-3xl mb-3"></i>
+                    <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No matching history</p>
+                  </div>
+                )}
+              </div>
+            </aside>
+
+            {/* MAIN BOARD */}
+            <div className="flex-grow flex flex-col items-center overflow-hidden">
+               <div className="w-full max-w-2xl flex-grow overflow-y-auto space-y-10 pb-12 pr-4 custom-scrollbar">
+                  <section>
+                    <div className="flex items-center justify-between mb-8 sticky top-0 bg-gray-50/95 backdrop-blur-md py-4 z-10">
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter">County Message Board</h2>
+                        <span className="bg-indigo-600 text-white text-[8px] font-black uppercase px-2 py-1 rounded-full shadow-md">Public Record</span>
+                      </div>
+                    </div>
+                    
+                    {user && (
+                      <div className="mb-12 bg-white p-8 rounded-[3rem] shadow-xl border border-indigo-50">
+                         <h3 className="text-sm font-black uppercase text-indigo-600 mb-6 flex items-center gap-2">
+                           <i className="fa-solid fa-paper-plane"></i> Message Your Elected Officials
+                         </h3>
+                         <form onSubmit={handlePostMessage} className="space-y-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black uppercase text-gray-400 ml-2">1. Select Official</label>
+                              <select 
+                                value={targetOfficial}
+                                onChange={(e) => setTargetOfficial(e.target.value)}
+                                className="w-full bg-gray-50 p-4 rounded-2xl outline-none font-bold text-sm border-2 border-transparent focus:border-indigo-100 transition-all cursor-pointer"
+                              >
+                                <option value="">-- Address to... --</option>
+                                {['Courthouse', 'Non-Courthouse', 'Council Members'].map(cat => (
+                                  <optgroup key={cat} label={cat.toUpperCase()}>
+                                    {OFFICIALS.filter(o => o.category === cat).map(o => (
+                                      <option key={o.id} value={o.name}>
+                                        {o.office}: {o.name} {o.district ? `(Dist ${o.district})` : ''}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                ))}
+                              </select>
+                            </div>
+                            
+                            <div className="flex items-center justify-end px-4 gap-4">
+                               <div className="text-right">
+                                 <p className="text-[10px] font-black uppercase text-gray-400">2. Privacy Mode</p>
+                                 <p className="text-[8px] font-bold text-gray-400">Hide your full name from public</p>
+                               </div>
+                               <button 
+                                 type="button"
+                                 onClick={() => setIsAnonymous(!isAnonymous)}
+                                 className={`w-14 h-8 rounded-full p-1 transition-colors relative ${isAnonymous ? 'bg-indigo-600' : 'bg-gray-200'}`}
+                               >
+                                 <div className={`w-6 h-6 bg-white rounded-full shadow-md transition-transform transform ${isAnonymous ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                               </button>
+                            </div>
+                          </div>
+
                           <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">1. Select Official</label>
-                            <select 
-                              value={targetOfficial}
-                              onChange={(e) => setTargetOfficial(e.target.value)}
-                              className="w-full bg-gray-50 p-4 rounded-2xl outline-none font-bold text-sm border-2 border-transparent focus:border-indigo-100 transition-all cursor-pointer"
-                            >
-                              <option value="">-- Address to... --</option>
-                              {['Courthouse', 'Non-Courthouse', 'Council Members'].map(cat => (
-                                <optgroup key={cat} label={cat.toUpperCase()}>
-                                  {OFFICIALS.filter(o => o.category === cat).map(o => (
-                                    <option key={o.id} value={o.name}>
-                                      {o.office}: {o.name} {o.district ? `(Dist ${o.district})` : ''}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              ))}
-                            </select>
+                            <label className="text-[10px] font-black uppercase text-gray-400 ml-2">3. Your Message</label>
+                            <textarea 
+                              value={newMessage}
+                              onChange={(e) => setNewMessage(e.target.value)}
+                              placeholder="Describe your inquiry clearly for the official public record..." 
+                              className="w-full h-32 bg-gray-50 rounded-3xl p-6 outline-none resize-none font-bold text-gray-700 placeholder:text-gray-300 border-2 border-transparent focus:border-indigo-100 transition-all"
+                            />
                           </div>
-                          
-                          <div className="flex items-center justify-end px-4 gap-4">
-                             <div className="text-right">
-                               <p className="text-[10px] font-black uppercase text-gray-400">2. Privacy Mode</p>
-                               <p className="text-[8px] font-bold text-gray-400">Toggle to hide your full name</p>
-                             </div>
-                             <button 
-                               type="button"
-                               onClick={() => setIsAnonymous(!isAnonymous)}
-                               className={`w-14 h-8 rounded-full p-1 transition-colors relative ${isAnonymous ? 'bg-indigo-600' : 'bg-gray-200'}`}
-                             >
-                               <div className={`w-6 h-6 bg-white rounded-full shadow-md transition-transform transform ${isAnonymous ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                             </button>
+
+                          <div className="flex justify-between items-center">
+                             <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">
+                               Posting from <span className="text-indigo-600 font-black">{user.user_metadata?.district}</span>
+                             </p>
+                             <button type="submit" className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:shadow-2xl hover:-translate-y-1 transition-all">Post to Board</button>
                           </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase text-gray-400 ml-2">3. Your Message</label>
-                          <textarea 
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            placeholder="Type your question or statement here for the official record..." 
-                            className="w-full h-32 bg-gray-50 rounded-3xl p-6 outline-none resize-none font-bold text-gray-700 placeholder:text-gray-300 border-2 border-transparent focus:border-indigo-100 transition-all"
-                          />
-                        </div>
-
-                        <div className="flex justify-between items-center">
-                           <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">
-                             Sending from <span className="text-indigo-600">{user.user_metadata?.district}</span>
-                           </p>
-                           <button type="submit" className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:shadow-2xl hover:-translate-y-1 transition-all">Submit to Board</button>
-                        </div>
-                       </form>
-                    </div>
-                  )}
-
-                  <div className="relative">
-                    <div className={`space-y-8 transition-all ${!user ? 'blur-md select-none opacity-40 pointer-events-none' : ''}`}>
-                      {messages.map(msg => (
-                        <div key={msg.id} className="flex flex-col gap-4">
-                          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 relative group">
-                            <div className="flex justify-between items-center mb-4">
-                              <span className="text-[9px] font-black uppercase tracking-tighter text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">To: {msg.to}</span>
-                              <span className="text-[8px] text-gray-300 font-bold uppercase">Constituent Inquiry</span>
-                            </div>
-                            <p className="text-gray-700 text-sm italic leading-relaxed mb-6">"{msg.text}"</p>
-                            <div className="pt-4 border-t border-gray-50 flex justify-between items-center">
-                               <div className="flex flex-col">
-                                 <span className="text-[10px] font-black uppercase text-gray-900">{msg.user}</span>
-                                 <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{msg.district} Voter</span>
-                               </div>
-                               <i className="fa-solid fa-quote-right text-gray-100 text-xl"></i>
-                            </div>
-                          </div>
-                          
-                          {/* OFFICIAL RESPONSE TAG */}
-                          {msg.response ? (
-                            <div className="ml-12 bg-blue-50/50 p-6 rounded-[2rem] border-l-4 border-blue-400 relative">
-                               <div className="flex items-center gap-2 mb-2">
-                                 <span className="bg-blue-600 text-white text-[7px] font-black uppercase px-2 py-0.5 rounded-full">Official Response</span>
-                                 <span className="text-[8px] font-black text-blue-900 uppercase tracking-tighter">{msg.response.author}</span>
-                               </div>
-                               <p className="text-blue-800 text-xs font-medium leading-snug">"{msg.response.text}"</p>
-                               <span className="absolute bottom-2 right-4 text-[7px] font-bold text-blue-300 uppercase">{msg.response.date}</span>
-                            </div>
-                          ) : (
-                            <div className="ml-12 border-l-2 border-gray-100 pl-4 py-2">
-                              <span className="text-[8px] font-black text-gray-300 uppercase tracking-[0.2em] italic">Awaiting Official Response...</span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    {!user && (
-                      <div className="absolute inset-0 flex items-center justify-center z-20">
-                        <div className="bg-white/90 backdrop-blur-xl p-8 rounded-[3rem] shadow-2xl border border-indigo-50 text-center max-w-sm">
-                          <div className="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
-                            <i className="fa-solid fa-user-shield"></i>
-                          </div>
-                          <h3 className="text-xl font-black mb-2 text-gray-800 uppercase tracking-tighter">Verified Conversation</h3>
-                          <p className="text-gray-500 text-xs mb-6">Only registered County voters can view or post to the County Message Board.</p>
-                          <button onClick={() => setCurrentPage('signup')} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-indigo-700 transition-all">Join the Registry</button>
-                        </div>
+                         </form>
                       </div>
                     )}
-                  </div>
-                </section>
-             </div>
+
+                    <div className="relative">
+                      <div className={`space-y-10 transition-all ${!user ? 'blur-md select-none opacity-40 pointer-events-none' : ''}`}>
+                        {filteredMessages.map(msg => (
+                          <div key={msg.id} id={`msg-${msg.id}`} className="flex flex-col gap-5 group">
+                            <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100 relative transition-all group-hover:shadow-md">
+                              <div className="flex justify-between items-center mb-5">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-50/50 px-3 py-1 rounded-xl">To: {msg.to}</span>
+                                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">{msg.date}</span>
+                              </div>
+                              <p className="text-gray-800 text-base italic leading-relaxed mb-8">"{msg.text}"</p>
+                              <div className="pt-5 border-t border-gray-50 flex justify-between items-center">
+                                 <div className="flex flex-col">
+                                   <span className="text-xs font-black uppercase text-gray-900 tracking-tight">{msg.user}</span>
+                                   <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{msg.district} Verified Voter</span>
+                                 </div>
+                                 <i className="fa-solid fa-quote-right text-indigo-50 text-2xl group-hover:text-indigo-100 transition-colors"></i>
+                              </div>
+                            </div>
+                            
+                            {/* OFFICIAL RESPONSE SECTION */}
+                            {msg.response ? (
+                              <div className="ml-12 bg-blue-50/40 p-8 rounded-[3rem] border-l-8 border-blue-500 relative shadow-sm">
+                                 <div className="flex items-center gap-3 mb-4">
+                                   <span className="bg-blue-600 text-white text-[8px] font-black uppercase px-3 py-1 rounded-full shadow-sm">Official Reply</span>
+                                   <span className="text-[10px] font-black text-blue-900 uppercase tracking-tighter">{msg.response.author}</span>
+                                 </div>
+                                 <p className="text-blue-900 text-sm font-semibold leading-relaxed">"{msg.response.text}"</p>
+                                 <span className="absolute bottom-4 right-6 text-[8px] font-black text-blue-300 uppercase">{msg.response.date}</span>
+                              </div>
+                            ) : (
+                              <div className="ml-16 border-l-4 border-gray-100 pl-6 py-4 flex items-center gap-3">
+                                <div className="w-2 h-2 bg-gray-200 rounded-full animate-pulse"></div>
+                                <span className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] italic">Pending Official Response</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {!user && (
+                        <div className="absolute inset-0 flex items-center justify-center z-20">
+                          <div className="bg-white/95 backdrop-blur-2xl p-10 rounded-[4rem] shadow-2xl border border-indigo-50 text-center max-w-sm">
+                            <div className="w-20 h-20 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl shadow-inner animate-pulse">
+                              <i className="fa-solid fa-user-lock"></i>
+                            </div>
+                            <h3 className="text-2xl font-black mb-3 text-gray-900 uppercase tracking-tighter">Verified Conversation</h3>
+                            <p className="text-gray-500 text-sm mb-8 leading-relaxed">Engagement with County officials requires a verified voter account. Secure your voice today.</p>
+                            <button onClick={() => setCurrentPage('signup')} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-indigo-700 transition-all hover:-translate-y-1">Join the Registry</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+               </div>
+            </div>
           </div>
         )}
 
@@ -449,13 +526,19 @@ export default function App() {
       </main>
 
       <footer className="bg-white border-t border-gray-100 py-3 px-6 text-center shrink-0">
-        <p className="text-[8px] font-black text-gray-400 uppercase tracking-[0.3em]">© 2024 transparency portal • County verified engagement</p>
+        <p className="text-[8px] font-black text-gray-400 uppercase tracking-[0.4em]">© 2024 transparency portal • County verified engagement</p>
       </footer>
 
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 10px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { 
+          background: #d1d5db; 
+          border-radius: 10px; 
+          border: 2px solid transparent;
+          background-clip: content-box;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #9ca3af; background-clip: content-box; }
       `}</style>
     </div>
   );
