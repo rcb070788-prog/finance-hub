@@ -2,16 +2,19 @@
   publish = "."
   functions = "netlify/functions"
 
+# Support for the "Drop Folder" dashboards
 [[redirects]]
   from = "/dashboards/*"
   to = "/dashboards/:splat"
   status = 200
 
+# Support for the Netlify Functions (Server-side code)
 [[redirects]]
   from = "/.netlify/functions/*"
   to = "/.netlify/functions/:splat"
   status = 200
 
+# General SPA redirect (keeps the React app working on refresh)
 [[redirects]]
   from = "/*"
   to = "/index.html"
