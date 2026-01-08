@@ -66,9 +66,10 @@ export default function App() {
     initSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        fetchProfile(currentUser.id);
       }
       if (event === 'SIGNED_OUT') {
         setProfile(null);
@@ -93,9 +94,11 @@ export default function App() {
   };
 
   const fetchPolls = async () => {
+    if (!supabase) return;
     setIsFetchingPolls(true);
     try {
-      const { data, error } = await supabase!
+      // Re-fetching polls, explicit order by creation time
+      const { data, error } = await supabase
         .from('polls')
         .select('*, poll_options(*), poll_votes(*), poll_comments(*, profiles(full_name, district))')
         .order('created_at', { ascending: false });
@@ -115,12 +118,14 @@ export default function App() {
   };
 
   const fetchSuggestions = async () => {
-    const { data } = await supabase!.from('suggestions').select('*, profiles(full_name, district)').order('created_at', { ascending: false });
+    if (!supabase) return;
+    const { data } = await supabase.from('suggestions').select('*, profiles(full_name, district)').order('created_at', { ascending: false });
     setSuggestions(data || []);
   };
 
   const fetchUsers = async () => {
-    const { data } = await supabase!.from('profiles').select('*').order('full_name', { ascending: true });
+    if (!supabase) return;
+    const { data } = await supabase.from('profiles').select('*').order('full_name', { ascending: true });
     setAllUsers(data || []);
   };
 
@@ -168,8 +173,14 @@ export default function App() {
   const handleCreatePoll = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const options = (fd.get('options') as string).split(',').map(s => s.trim()).filter(s => s !== "");
+    const optionsString = fd.get('options') as string;
+    const options = optionsString.split(',').map(s => s.trim()).filter(s => s !== "");
     
+    if (options.length < 2) {
+      showToast("Please provide at least two options.", "error");
+      return;
+    }
+
     try {
       await adminRequest('CREATE_POLL', {
         pollData: {
@@ -180,11 +191,17 @@ export default function App() {
         },
         options
       });
-      showToast("Poll Launched!");
+      showToast("Poll Launched Successfully!");
       (e.target as HTMLFormElement).reset();
-      // Force a re-fetch of polls after a short delay to allow DB consistency
-      setTimeout(() => fetchPolls(), 500);
-    } catch (err: any) { showToast(err.message, 'error'); }
+      
+      // Wait briefly for the serverless function and DB to finish, then fetch
+      setTimeout(async () => {
+        await fetchPolls();
+        setCurrentPage('polls');
+      }, 800);
+    } catch (err: any) { 
+      showToast(err.message, 'error'); 
+    }
   };
 
   const handleVote = async (pollId: string, optionId: string) => {
@@ -231,14 +248,14 @@ export default function App() {
           <div className="hidden md:flex gap-6">
             <button onClick={() => { setCurrentPage('polls'); setSelectedPoll(null); setAiSummary(null); fetchPolls(); }} className={`text-[10px] font-black uppercase tracking-widest ${currentPage === 'polls' ? 'text-indigo-600' : 'text-gray-400'}`}>Polls</button>
             <button onClick={() => { setCurrentPage('suggestions'); setSelectedPoll(null); setAiSummary(null); }} className={`text-[10px] font-black uppercase tracking-widest ${currentPage === 'suggestions' ? 'text-indigo-600' : 'text-gray-400'}`}>Suggestions</button>
-            {profile?.is_admin && <button onClick={() => { setCurrentPage('admin'); fetchUsers(); }} className="text-[10px] font-black uppercase tracking-widest text-red-500">Admin</button>}
+            {profile?.is_admin && <button onClick={() => { setCurrentPage('admin'); fetchUsers(); }} className={`text-[10px] font-black uppercase tracking-widest ${currentPage === 'admin' ? 'text-red-600' : 'text-red-400'}`}>Admin</button>}
           </div>
         </div>
         <div className="flex gap-4 items-center">
           {user ? (
             <div className="flex items-center gap-4">
               <div className="text-right hidden sm:block">
-                <span className="text-[10px] font-black uppercase text-indigo-600 block">{profile?.full_name || user.user_metadata?.full_name}</span>
+                <span className="text-[10px] font-black uppercase text-indigo-600 block">{profile?.full_name || user.user_metadata?.full_name || "Voter"}</span>
                 <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Voter ID: {profile?.voter_id || user.user_metadata?.voter_id}</span>
               </div>
               <button onClick={() => supabase!.auth.signOut()} className="text-[10px] font-black uppercase text-red-500 hover:scale-105 transition-transform">Logout</button>
@@ -275,11 +292,13 @@ export default function App() {
           <div className="max-w-4xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
               <h2 className="text-4xl font-black uppercase tracking-tighter">Community Polls</h2>
-              {isFetchingPolls && <i className="fa-solid fa-spinner fa-spin text-indigo-600"></i>}
+              <button onClick={fetchPolls} disabled={isFetchingPolls} className="p-2 text-gray-400 hover:text-indigo-600">
+                <i className={`fa-solid fa-sync ${isFetchingPolls ? 'fa-spin' : ''}`}></i>
+              </button>
             </div>
             <div className="grid grid-cols-1 gap-6">
               {polls.length > 0 ? polls.map(poll => {
-                const isClosed = new Date(poll.closed_at) < new Date();
+                const isClosed = poll.closed_at ? new Date(poll.closed_at) < new Date() : false;
                 return (
                   <div key={poll.id} onClick={() => setSelectedPoll(poll)} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 hover:shadow-lg transition-all cursor-pointer flex flex-col md:flex-row justify-between items-center relative overflow-hidden">
                     {isClosed && <div className="absolute top-0 right-0 bg-gray-900 text-white px-4 py-1 text-[8px] font-black uppercase tracking-widest">Closed</div>}
@@ -327,8 +346,8 @@ export default function App() {
 
                 <div className="space-y-4">
                   {selectedPoll.poll_options.map((opt: any) => {
-                    const totalVotes = selectedPoll.poll_votes.length || 0;
-                    const votesCount = selectedPoll.poll_votes.filter((v: any) => v.option_id === opt.id).length;
+                    const totalVotes = selectedPoll.poll_votes?.length || 0;
+                    const votesCount = selectedPoll.poll_votes?.filter((v: any) => v.option_id === opt.id).length || 0;
                     const percent = totalVotes === 0 ? 0 : Math.round((votesCount / totalVotes) * 100);
                     return (
                       <button key={opt.id} onClick={() => handleVote(selectedPoll.id, opt.id)} className="w-full text-left p-6 rounded-2xl border-2 border-gray-50 hover:border-indigo-100 hover:bg-indigo-50/20 group relative overflow-hidden transition-all">
@@ -347,7 +366,7 @@ export default function App() {
                      {selectedPoll.poll_comments?.filter((c: any) => !c.is_hidden).map((c: any) => (
                        <div key={c.id} className="bg-gray-50 p-6 rounded-2xl border border-transparent hover:border-indigo-100 transition-all">
                          <p className="text-gray-800 font-bold mb-2">"{c.content}"</p>
-                         <p className="text-[9px] font-black uppercase text-indigo-400">{c.profiles?.full_name} • District {c.profiles?.district}</p>
+                         <p className="text-[9px] font-black uppercase text-indigo-400">{c.profiles?.full_name || "Voter"} • District {c.profiles?.district || "N/A"}</p>
                        </div>
                      ))}
                    </div>
@@ -389,7 +408,7 @@ export default function App() {
                  <div key={s.id} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col justify-between hover:shadow-md transition-all">
                    <p className="text-gray-800 font-bold text-lg mb-6 italic">"{s.content}"</p>
                    <div className="flex justify-between items-center text-[10px] font-black uppercase text-gray-400 border-t pt-4">
-                     <span>{s.profiles?.full_name} • District {s.profiles?.district}</span>
+                     <span>{s.profiles?.full_name || "Voter"} • District {s.profiles?.district || "N/A"}</span>
                      <span>{new Date(s.created_at).toLocaleDateString()}</span>
                    </div>
                  </div>
@@ -491,9 +510,6 @@ export default function App() {
                   const d = await res.json();
                   if (!res.ok) throw new Error(d.error);
                   
-                  const { error } = await supabase!.from('voter_registry').select('voter_id').eq('voter_id', d.voterId).single();
-                  if (error) throw new Error("Voter registry sync error.");
-
                   const { error: signUpError } = await supabase!.auth.signUp({ 
                     email: fd.get('email') as string, 
                     password: fd.get('password') as string, 
