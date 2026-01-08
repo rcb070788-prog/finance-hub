@@ -52,13 +52,15 @@ export default function App() {
   }, []);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase!.from('profiles').select('*').eq('id', userId).single();
+    if (!supabase) return;
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
     if (data) setProfile(data);
   };
 
   const handleLogout = async () => {
+    if (!supabase) return;
     try {
-      await supabase!.auth.signOut();
+      await supabase.auth.signOut();
       setUser(null); setProfile(null); setCurrentPage('home');
       showToast("Logged out");
     } catch {
@@ -68,8 +70,10 @@ export default function App() {
   };
 
   const fetchPolls = async () => {
+    if (!supabase) return;
     try {
-      const { data, error } = await supabase!
+      // Deep fetch including Names, Districts, and Likes
+      const { data, error } = await supabase
         .from('polls')
         .select(`
           *,
@@ -81,17 +85,32 @@ export default function App() {
           )
         `)
         .order('created_at', { ascending: false });
-      if (!error) setPolls(data || []);
-    } catch (err) { console.error(err); }
+
+      if (error) {
+        console.warn("Complex poll fetch issue:", error.message);
+        // Fallback fetch if the database relationships aren't 100% perfect yet
+        const { data: simpleData } = await supabase
+          .from('polls')
+          .select('*, poll_options(*), poll_votes(*), poll_comments(*)')
+          .order('created_at', { ascending: false });
+        setPolls(simpleData || []);
+      } else {
+        setPolls(data || []);
+      }
+    } catch (err) { 
+      console.error("Polls fetch error:", err);
+    }
   };
 
   const fetchSuggestions = async () => {
-    const { data } = await supabase!.from('suggestions').select('*, profiles(full_name, district)').order('created_at', { ascending: false });
+    if (!supabase) return;
+    const { data } = await supabase.from('suggestions').select('*, profiles(full_name, district)').order('created_at', { ascending: false });
     setSuggestions(data || []);
   };
 
   const fetchUsers = async () => {
-    const { data } = await supabase!.from('profiles').select('*').order('full_name', { ascending: true });
+    if (!supabase) return;
+    const { data } = await supabase.from('profiles').select('*').order('full_name', { ascending: true });
     setAllUsers(data || []);
   };
 
@@ -103,10 +122,11 @@ export default function App() {
   const handlePostComment = async (e: React.FormEvent<HTMLFormElement>, pollId: string, parentId: string | null = null) => {
     e.preventDefault();
     if (!user) return setCurrentPage('login');
+    if (!supabase) return;
     const fd = new FormData(e.currentTarget);
     const content = fd.get('content') as string;
     
-    const { error } = await supabase!.from('poll_comments').insert({ 
+    const { error } = await supabase.from('poll_comments').insert({ 
       poll_id: pollId, 
       user_id: user.id, 
       content,
@@ -124,7 +144,8 @@ export default function App() {
 
   const handleReaction = async (commentId: string, type: 'like' | 'dislike') => {
     if (!user) return setCurrentPage('login');
-    const { error } = await supabase!.from('comment_reactions').upsert(
+    if (!supabase) return;
+    const { error } = await supabase.from('comment_reactions').upsert(
       { comment_id: commentId, user_id: user.id, reaction_type: type },
       { onConflict: 'comment_id,user_id' }
     );
@@ -133,11 +154,12 @@ export default function App() {
   };
 
   const renderComments = (pollComments: any[], pollId: string, parentId: string | null = null, depth = 0) => {
-    return pollComments
+    return (pollComments || [])
       .filter(c => c.parent_id === parentId && !c.is_hidden)
       .map(comment => {
-        const likes = comment.comment_reactions?.filter((r: any) => r.reaction_type === 'like').length || 0;
-        const dislikes = comment.comment_reactions?.filter((r: any) => r.reaction_type === 'dislike').length || 0;
+        const reactions = comment.comment_reactions || [];
+        const likes = reactions.filter((r: any) => r.reaction_type === 'like').length;
+        const dislikes = reactions.filter((r: any) => r.reaction_type === 'dislike').length;
         
         return (
           <div key={comment.id} className={`${depth > 0 ? 'ml-8 mt-2 border-l-2 border-gray-100 pl-4' : 'bg-gray-50 p-4 rounded-2xl mb-4'}`}>
@@ -170,7 +192,8 @@ export default function App() {
   };
 
   const adminRequest = async (action: string, payload: any) => {
-    const { data: { session } } = await supabase!.auth.getSession();
+    if (!supabase) throw new Error("Database not ready");
+    const { data: { session } } = await supabase.auth.getSession();
     const res = await fetch('/.netlify/functions/admin-actions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
@@ -197,7 +220,8 @@ export default function App() {
 
   const handleVote = async (pollId: string, optionId: string) => {
     if (!user) return setCurrentPage('login');
-    const { error } = await supabase!.from('poll_votes').upsert({ poll_id: pollId, option_id: optionId, user_id: user.id }, { onConflict: 'poll_id,user_id' });
+    if (!supabase) return;
+    const { error } = await supabase.from('poll_votes').upsert({ poll_id: pollId, option_id: optionId, user_id: user.id }, { onConflict: 'poll_id,user_id' });
     if (error) showToast(error.message, "error");
     else fetchPolls();
   };
@@ -224,7 +248,7 @@ export default function App() {
             <span className="text-xl font-bold text-gray-900 tracking-tight uppercase">Finance Hub</span>
           </div>
           <div className="hidden md:flex gap-6">
-            <button onClick={() => { setCurrentPage('polls'); setSelectedPoll(null); }} className={`text-[10px] font-black uppercase tracking-widest ${currentPage === 'polls' ? 'text-indigo-600' : 'text-gray-400'}`}>Polls</button>
+            <button onClick={() => { setCurrentPage('polls'); setSelectedPoll(null); fetchPolls(); }} className={`text-[10px] font-black uppercase tracking-widest ${currentPage === 'polls' ? 'text-indigo-600' : 'text-gray-400'}`}>Polls</button>
             <button onClick={() => { setCurrentPage('suggestions'); setSelectedPoll(null); }} className={`text-[10px] font-black uppercase tracking-widest ${currentPage === 'suggestions' ? 'text-indigo-600' : 'text-gray-400'}`}>Suggestions</button>
             {profile?.is_admin && <button onClick={() => { setCurrentPage('admin'); fetchUsers(); }} className="text-[10px] font-black uppercase tracking-widest text-red-500">Admin</button>}
           </div>
@@ -272,6 +296,11 @@ export default function App() {
                   <button className="bg-indigo-600 text-white px-8 py-4 rounded-xl font-black uppercase text-[10px]">View Detail</button>
                 </div>
               ))}
+              {polls.length === 0 && (
+                <div className="text-center py-20 bg-white rounded-[2rem] border-2 border-dashed border-gray-100">
+                  <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">No active polls found.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -317,8 +346,9 @@ export default function App() {
                <h2 className="text-3xl font-black uppercase text-indigo-600 mb-6">Suggestion Box</h2>
                <form onSubmit={async (e) => {
                  e.preventDefault();
+                 if (!supabase) return;
                  const fd = new FormData(e.currentTarget);
-                 const { error } = await supabase!.from('suggestions').insert({ content: fd.get('content'), is_public: fd.get('isPublic') === 'on', user_id: user?.id });
+                 const { error } = await supabase.from('suggestions').insert({ content: fd.get('content'), is_public: fd.get('isPublic') === 'on', user_id: user?.id });
                  if (!error) { showToast("Thank you!"); fetchSuggestions(); (e.target as any).reset(); }
                }} className="space-y-6">
                  <textarea name="content" required placeholder="Share an idea..." className="w-full h-40 bg-gray-50 rounded-3xl p-6 outline-none font-bold" />
@@ -396,8 +426,9 @@ export default function App() {
             <h2 className="text-3xl font-black text-center mb-8 uppercase text-indigo-600">Sign In</h2>
             <form className="space-y-4" onSubmit={async (e) => {
               e.preventDefault();
+              if (!supabase) return;
               const fd = new FormData(e.currentTarget);
-              const { error } = await supabase!.auth.signInWithPassword({ email: fd.get('email') as string, password: fd.get('password') as string });
+              const { error } = await supabase.auth.signInWithPassword({ email: fd.get('email') as string, password: fd.get('password') as string });
               if (error) showToast(error.message, 'error'); else setCurrentPage('home');
             }}>
               <input name="email" type="email" required placeholder="EMAIL" className="w-full p-4 bg-gray-50 rounded-xl font-bold outline-none" />
