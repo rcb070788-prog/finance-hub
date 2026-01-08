@@ -44,10 +44,15 @@ export default function App() {
     initSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("Auth Event Triggered:", event);
+      console.log("Auth Event:", event);
       setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
-      else setProfile(null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+        setCurrentPage('home');
+        setSelectedPoll(null);
+      }
     });
 
     fetchPolls();
@@ -59,13 +64,20 @@ export default function App() {
   const fetchProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase!.from('profiles').select('*').eq('id', userId).single();
-      if (error) {
-        console.warn("Profile Fetch Error (Normal for new users):", error.message);
-        return;
-      }
-      console.log("Profile Loaded:", data);
+      if (error) return;
       setProfile(data);
-    } catch (e) { console.error("Profile catch error:", e); }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleLogout = async () => {
+    if (!supabase) return;
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      showToast("Logged out successfully");
+    } catch (err: any) {
+      showToast("Logout failed: " + err.message, "error");
+    }
   };
 
   const fetchPolls = async () => {
@@ -76,32 +88,26 @@ export default function App() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        const { data: simpleData, error: simpleError } = await supabase!
+        const { data: simpleData } = await supabase!
           .from('polls')
           .select('*, poll_options(*), poll_votes(*), poll_comments(*)')
           .order('created_at', { ascending: false });
-
-        if (simpleError) {
-          showToast("Database error: " + simpleError.message, 'error');
-          return;
-        }
         setPolls(simpleData || []);
       } else {
         setPolls(data || []);
       }
-    } catch (err) {
-      console.error("Critical crash in fetchPolls:", err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const fetchSuggestions = async () => {
-    const { data, error } = await supabase!.from('suggestions').select('*, profiles(full_name, district)').order('created_at', { ascending: false });
-    if (error) console.error("Suggestion Fetch Error:", error.message);
+    if (!supabase) return;
+    const { data } = await supabase.from('suggestions').select('*, profiles(full_name, district)').order('created_at', { ascending: false });
     setSuggestions(data || []);
   };
 
   const fetchUsers = async () => {
-    const { data } = await supabase!.from('profiles').select('*').order('full_name', { ascending: true });
+    if (!supabase) return;
+    const { data } = await supabase.from('profiles').select('*').order('full_name', { ascending: true });
     setAllUsers(data || []);
   };
 
@@ -111,11 +117,10 @@ export default function App() {
   };
 
   const adminRequest = async (action: string, payload: any) => {
-    // CRITICAL FIX: Always get a fresh session to ensure the token hasn't expired
     const { data: { session }, error: sessionError } = await supabase!.auth.getSession();
     
     if (sessionError || !session) {
-      throw new Error("Session expired. Please sign out and sign back in.");
+      throw new Error("Your session has expired. Please log out and sign back in.");
     }
 
     const res = await fetch('/.netlify/functions/admin-actions', {
@@ -128,9 +133,15 @@ export default function App() {
     });
     
     const data = await res.json();
+    
     if (res.status === 401) {
-       throw new Error("Authentication failed. Try logging out and back in.");
+      throw new Error("Unauthorized: Your login token is invalid. Please log out and back in.");
     }
+    
+    if (res.status === 403) {
+      throw new Error("Forbidden: Only verified administrators can perform this action.");
+    }
+
     if (!res.ok) throw new Error(data.error || "Action failed");
     return data;
   };
@@ -152,7 +163,7 @@ export default function App() {
         },
         options
       });
-      showToast("Poll Launched!");
+      showToast("Poll Launched Successfully!");
       (e.target as HTMLFormElement).reset();
       setTimeout(fetchPolls, 1000);
     } catch (err: any) { 
@@ -224,7 +235,7 @@ export default function App() {
           {user ? (
             <div className="flex items-center gap-4">
               <span className="text-[9px] md:text-[10px] font-black uppercase text-indigo-600 truncate max-w-[100px]">{profile?.full_name || 'Voter'}</span>
-              <button onClick={() => supabase!.auth.signOut()} className="text-[9px] md:text-[10px] font-black uppercase text-red-500">Logout</button>
+              <button onClick={handleLogout} className="text-[9px] md:text-[10px] font-black uppercase text-red-500">Logout</button>
             </div>
           ) : (
             <div className="flex gap-2">
@@ -344,7 +355,7 @@ export default function App() {
                  <textarea name="content" required placeholder="Share an idea for Moore County..." className="w-full h-32 md:h-40 bg-gray-50 rounded-3xl p-6 outline-none font-bold text-base md:text-lg" />
                  <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                    <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" name="isPublic" defaultChecked className="w-4 h-4 accent-indigo-600" /> <span className="text-[10px] font-black uppercase text-gray-400">Public Suggestion</span></label>
-                   <button type="submit" className="w-full md:w-auto bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black uppercase text-xs shadow-xl">Submit</button>
+                   <button type="submit" className="w-full md:auto bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black uppercase text-xs shadow-xl">Submit</button>
                  </div>
                </form>
              </div>
