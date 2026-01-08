@@ -1,15 +1,39 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { CATEGORIES, DASHBOARDS, OFFICIALS } from './constants.ts';
 import { DashboardConfig } from './types.ts';
 
+// --- CONFIGURATION ---
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
 
 const supabase = (supabaseUrl && supabaseAnonKey) 
   ? createClient(supabaseUrl, supabaseAnonKey) 
   : null;
+
+// --- UTILITIES ---
+const renderTextWithLinks = (text: string) => {
+  if (!text) return null;
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, i) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a 
+          key={i} 
+          href={part} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="text-indigo-600 hover:underline break-all"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part} <i className="fa-solid fa-external-link text-[8px] ml-1"></i>
+        </a>
+      );
+    }
+    return part;
+  });
+};
 
 const Toast = ({ message, type }: { message: string, type: 'success' | 'error' }) => (
   <div className={`fixed bottom-4 right-4 p-4 rounded-lg shadow-xl text-white z-[100] transition-all transform animate-bounce ${type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
@@ -19,128 +43,151 @@ const Toast = ({ message, type }: { message: string, type: 'success' | 'error' }
 );
 
 export default function App() {
+  // --- CORE STATE ---
   const [currentPage, setCurrentPage] = useState('home');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeDashboard, setActiveDashboard] = useState<DashboardConfig | null>(null);
   const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   
-  // Mobile Layout States
+  // --- FEATURE DATA ---
+  const [polls, setPolls] = useState<any[]>([]);
+  const [selectedPoll, setSelectedPoll] = useState<any>(null);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [boardMessages, setBoardMessages] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  
+  // --- UI & INTERACTION STATE ---
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [replyTo, setReplyTo] = useState<string | null>(null);
   const [selectedOfficials, setSelectedOfficials] = useState<string[]>([]);
   const [isOfficialDropdownOpen, setIsOfficialDropdownOpen] = useState(false);
+  const [pendingVote, setPendingVote] = useState<{pollId: string, optionId: string, optionText: string, isAnonymous: boolean} | null>(null);
 
-  const [messages, setMessages] = useState([
-    { 
-      id: '1', 
-      user: 'Jane D.', 
-      district: 'Dist 4', 
-      to: 'Mayor Sloan Stewart', 
-      text: 'What is the timeline for the new courthouse roof repairs?', 
-      isAnonymous: false,
-      date: 'Oct 24, 2024',
-      response: { author: 'Mayor Sloan Stewart', text: 'We have approved the contractor, work begins next Monday.', date: '2 hours ago' }
-    },
-    { 
-      id: '2', 
-      user: 'Verified Voter', 
-      district: 'Dist 2', 
-      to: 'Robert Bracewell', 
-      text: 'Thank you for looking into the District 2 drainage issues.', 
-      isAnonymous: true,
-      date: 'Oct 23, 2024',
-      response: null
-    }
-  ]);
-  
-  const filteredMessages = useMemo(() => {
-    if (!searchQuery) return messages;
-    const q = searchQuery.toLowerCase();
-    return messages.filter(m => 
-      m.user.toLowerCase().includes(q) || 
-      m.to.toLowerCase().includes(q) || 
-      m.text.toLowerCase().includes(q) ||
-      (m.response?.author.toLowerCase().includes(q))
-    );
-  }, [messages, searchQuery]);
-
-  const [newMessage, setNewMessage] = useState('');
-  const [isAnonymous, setIsAnonymous] = useState(false);
-
-  if (!supabase) {
-    return (
-      <div className="min-h-screen bg-indigo-900 flex items-center justify-center p-6 text-white text-center font-sans">
-        <div className="max-w-md">
-          <i className="fa-solid fa-key text-6xl mb-6 text-yellow-400"></i>
-          <h1 className="text-3xl font-black mb-4">Setup Required</h1>
-          <p className="text-indigo-200 mb-8 leading-relaxed">Missing Supabase configuration.</p>
-        </div>
-      </div>
-    );
-  }
-
+  // --- INITIALIZATION ---
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    if (!supabase) return;
+    
+    const initSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
-    });
+      if (session?.user) fetchProfile(session.user.id);
+    };
+
+    initSession();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
-      if (event === 'SIGNED_IN') {
-        showToast("Access Granted!", "success");
+      if (session?.user) {
+        fetchProfile(session.user.id);
+        if (event === 'SIGNED_IN') showToast("Access Granted");
+      } else {
+        setProfile(null);
         setCurrentPage('home');
-      }
-      if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setCurrentPage('home');
+        setSelectedPoll(null);
       }
     });
+
+    fetchAllData();
     return () => subscription.unsubscribe();
   }, []);
+
+  // Update selected poll details when the main polls list is refreshed
+  useEffect(() => {
+    if (selectedPoll) {
+      const updated = polls.find(p => p.id === selectedPoll.id);
+      if (updated) setSelectedPoll(updated);
+    }
+  }, [polls]);
+
+  // --- DATA FETCHING ---
+  const fetchProfile = async (userId: string) => {
+    if (!supabase) return;
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+    if (data) setProfile(data);
+  };
+
+  const fetchAllData = () => {
+    fetchPolls();
+    fetchSuggestions();
+    fetchBoardMessages();
+  };
+
+  const fetchPolls = async () => {
+    if (!supabase) return;
+    const { data } = await supabase
+      .from('polls')
+      .select(`
+        *,
+        poll_options(*),
+        poll_votes(*, profiles(full_name, district)),
+        poll_comments(*, profiles(full_name, district), comment_reactions(*))
+      `)
+      .order('created_at', { ascending: false });
+    if (data) setPolls(data);
+  };
+
+  const fetchSuggestions = async () => {
+    if (!supabase) return;
+    const { data } = await supabase.from('suggestions').select('*, profiles(full_name, district)').order('created_at', { ascending: false });
+    setSuggestions(data || []);
+  };
+
+  const fetchBoardMessages = async () => {
+    if (!supabase) return;
+    const { data } = await supabase.from('board_messages').select('*, profiles(full_name, district)').order('created_at', { ascending: false });
+    setBoardMessages(data || []);
+  };
+
+  const fetchUsers = async () => {
+    if (!supabase) return;
+    const { data } = await supabase.from('profiles').select('*').order('full_name', { ascending: true });
+    setAllUsers(data || []);
+  };
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
+  // --- AUTH HANDLERS ---
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsVerifying(true);
-    const formData = new FormData(e.currentTarget);
-    const lastName = formData.get('lastName') as string;
-    const voterId = formData.get('voterId') as string;
-    const dob = formData.get('dob') as string;
-    const address = formData.get('address') as string;
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
+    const fd = new FormData(e.currentTarget);
+    const lastName = fd.get('lastName') as string;
+    const voterId = fd.get('voterId') as string;
+    const dob = fd.get('dob') as string;
+    const address = fd.get('address') as string;
+    const email = fd.get('email') as string;
+    const password = fd.get('password') as string;
 
     try {
       const verifyRes = await fetch('/.netlify/functions/verify-voter', {
         method: 'POST',
         body: JSON.stringify({ lastName, voterId, dob, address }),
       });
-
       const verifyData = await verifyRes.json();
+      if (!verifyRes.ok) throw new Error(verifyData.error || "Verification failed");
 
-      if (!verifyRes.ok) {
-        throw new Error(verifyData.error || "Verification failed");
-      }
-
-      const { error } = await supabase.auth.signUp({
+      const { error } = await supabase!.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            full_name: verifyData.fullName,
-            district: verifyData.district,
-            voter_id: voterId
-          }
+        options: { 
+          data: { 
+            full_name: verifyData.fullName, 
+            district: verifyData.district, 
+            voter_id: voterId 
+          } 
         }
       });
-
       if (error) throw error;
-      showToast("Verification Successful! Check your email for confirmation.", "success");
+      showToast("Verification Successful! Check your email.", "success");
+      setCurrentPage('login');
     } catch (err: any) {
       showToast(err.message, "error");
     } finally {
@@ -148,70 +195,139 @@ export default function App() {
     }
   };
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
-
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) throw error;
-    } catch (err: any) {
-      showToast(err.message, "error");
-    }
+  const handleLogout = async () => {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    showToast("Logged out");
   };
 
-  const handlePostMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || selectedOfficials.length === 0) {
-      showToast("Please select at least one official and type a message.", "error");
-      return;
-    }
-    
-    const addressedTo = selectedOfficials.join(', ');
-    
-    const post = {
-      id: Date.now().toString(),
-      user: isAnonymous ? 'Verified Voter' : (user.user_metadata?.full_name?.split(' ')[0] + ' ' + (user.user_metadata?.full_name?.split(' ')[1]?.[0] || '') + '.'),
-      district: user.user_metadata?.district || 'Member',
-      to: addressedTo,
-      text: newMessage,
-      isAnonymous,
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      response: null
-    };
-    
-    setMessages([post, ...messages]);
-    setNewMessage('');
-    setSelectedOfficials([]);
-    showToast("Message Posted! Notification Sent (Simulated).", "success");
-  };
-
-  const toggleOfficial = (name: string) => {
-    setSelectedOfficials(prev => 
-      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+  // --- MESSAGE BOARD LOGIC ---
+  const filteredMessages = useMemo(() => {
+    if (!searchQuery) return boardMessages;
+    const q = searchQuery.toLowerCase();
+    return boardMessages.filter(m => 
+      m.profiles?.full_name?.toLowerCase().includes(q) || 
+      m.recipient_names.toLowerCase().includes(q) || 
+      m.content.toLowerCase().includes(q)
     );
+  }, [boardMessages, searchQuery]);
+
+  const handlePostBoardMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !supabase) return;
+    const fd = new FormData(e.target as HTMLFormElement);
+    const content = fd.get('content') as string;
+    const isAnon = fd.get('isAnon') === 'on';
+    
+    if (!content.trim() || selectedOfficials.length === 0) {
+      return showToast("Select officials and type a message.", "error");
+    }
+
+    const { error } = await supabase.from('board_messages').insert({
+      user_id: user.id,
+      recipient_names: selectedOfficials.join(', '),
+      content,
+      is_anonymous: isAnon
+    });
+
+    if (error) showToast(error.message, 'error');
+    else {
+      showToast("Message Sent to Public Record");
+      setSelectedOfficials([]);
+      (e.target as HTMLFormElement).reset();
+      fetchBoardMessages();
+    }
   };
 
-  const goHome = () => {
-    setCurrentPage('home');
-    setSelectedCategory(null);
-    setActiveDashboard(null);
+  // --- VOTING LOGIC ---
+  const initiateVote = (pollId: string, optionId: string, optionText: string) => {
+    if (!user) return setCurrentPage('login');
+    const poll = polls.find(p => p.id === pollId);
+    const existingVote = poll?.poll_votes?.find((v: any) => v.user_id === user.id);
+    if (existingVote?.option_id === optionId) return; // Already voted this
+    setPendingVote({ pollId, optionId, optionText, isAnonymous: false });
   };
 
+  const confirmVote = async () => {
+    if (!pendingVote || !supabase) return;
+    const { error } = await supabase.from('poll_votes').upsert(
+      { 
+        poll_id: pendingVote.pollId, 
+        option_id: pendingVote.optionId, 
+        user_id: user.id, 
+        is_anonymous: pendingVote.isAnonymous 
+      },
+      { onConflict: 'poll_id,user_id' }
+    );
+    if (error) {
+      showToast(error.message, 'error');
+    } else { 
+      showToast("Vote recorded successfully"); 
+      fetchPolls(); 
+    }
+    setPendingVote(null);
+  };
+
+  // --- COMMENT LOGIC ---
+  const renderComments = (pollComments: any[], pollId: string, parentId: string | null = null, depth = 0) => {
+    return (pollComments || [])
+      .filter(c => c.parent_id === parentId && !c.is_hidden)
+      .map(comment => (
+        <div key={comment.id} className={`${depth > 0 ? 'ml-6 mt-2 border-l-2 border-gray-100 pl-4' : 'bg-gray-50 p-4 rounded-2xl mb-4'}`}>
+          <div className="flex flex-col">
+            <span className="text-[9px] font-black uppercase text-indigo-600 mb-1">
+              {comment.profiles?.full_name || 'Verified Voter'} • Dist {comment.profiles?.district || '?'}
+            </span>
+            <div className="text-gray-800 text-sm font-medium leading-relaxed">
+              {renderTextWithLinks(comment.content)}
+            </div>
+            <div className="flex gap-4 mt-3 text-[9px] font-black uppercase">
+              <button className="text-gray-400 hover:text-indigo-600">Like</button>
+              <button onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)} className="text-gray-400 hover:text-indigo-600">Reply</button>
+            </div>
+            
+            {replyTo === comment.id && (
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                const content = fd.get('content') as string;
+                await supabase?.from('poll_comments').insert({ 
+                  poll_id: pollId, 
+                  user_id: user.id, 
+                  content, 
+                  parent_id: comment.id 
+                });
+                setReplyTo(null); fetchPolls();
+              }} className="mt-3 flex gap-2">
+                <input name="content" autoFocus placeholder="Write a reply..." className="flex-grow p-3 bg-white rounded-xl text-xs outline-none border shadow-sm" />
+                <button type="submit" className="bg-indigo-600 text-white px-4 py-1 rounded-xl text-[9px] font-black uppercase">Send</button>
+              </form>
+            )}
+          </div>
+          {renderComments(pollComments, pollId, comment.id, depth + 1)}
+        </div>
+      ));
+  };
+
+  // --- ADMIN ACTIONS ---
+  const adminRequest = async (action: string, payload: any) => {
+    if (!supabase) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch('/.netlify/functions/admin-actions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, payload })
+    });
+    if (!res.ok) throw new Error("Action failed");
+    return res.json();
+  };
+
+  // --- RENDER HELPERS ---
   if (activeDashboard) {
     return (
-      <div className="fixed inset-0 z-[100] bg-white flex flex-col font-sans overflow-hidden">
-        {toast && <Toast message={toast.message} type={toast.type} />}
-        <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-[110]">
-          <button onClick={() => setActiveDashboard(null)} className="bg-white/95 backdrop-blur-md shadow-xl border border-gray-100 text-gray-800 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl hover:bg-red-600 hover:text-white transition-all flex items-center gap-1 sm:gap-2 text-[9px] sm:text-[10px] font-black uppercase tracking-widest group">
-            <i className="fa-solid fa-xmark text-xs sm:text-sm group-hover:rotate-90 transition-transform"></i> 
-            <span>Close Report</span>
-          </button>
+      <div className="fixed inset-0 z-[100] bg-white flex flex-col overflow-hidden">
+        <div className="p-4 flex justify-end bg-white border-b border-gray-100">
+          <button onClick={() => setActiveDashboard(null)} className="bg-gray-900 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest">Close Report</button>
         </div>
         <iframe src={activeDashboard.folderPath} className="w-full h-full border-0" title={activeDashboard.title} />
       </div>
@@ -221,63 +337,146 @@ export default function App() {
   return (
     <div className="h-screen bg-gray-50 flex flex-col font-sans overflow-hidden relative">
       {toast && <Toast message={toast.message} type={toast.type} />}
-      
-      {/* IMPROVED MOBILE NAV */}
-      <nav className="bg-white shadow-sm px-3 md:px-6 py-3 flex justify-between items-center z-50 shrink-0 border-b border-gray-100">
-        <div className="flex items-center gap-2 md:gap-10">
-          <div className="flex items-center cursor-pointer" onClick={goHome}>
-            <i className="fa-solid fa-landmark text-indigo-600 text-lg md:text-2xl mr-1.5 md:mr-3"></i>
-            <span className="text-xs md:text-xl font-bold text-gray-900 tracking-tight whitespace-nowrap">
-               <span className="hidden xs:inline">County </span>Finance Hub
-            </span>
+
+      {/* --- VOTING CONFIRMATION MODAL --- */}
+      {pendingVote && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 space-y-6 animate-slide-up">
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto text-2xl mb-4">
+                <i className="fa-solid fa-vote-yea"></i>
+              </div>
+              <h3 className="text-xl font-black uppercase">Confirm Your Vote</h3>
+              <p className="text-gray-500 text-sm">Voting for: <span className="text-indigo-600 font-bold">"{pendingVote.optionText}"</span></p>
+            </div>
+            <div className="bg-gray-50 p-6 rounded-2xl border flex items-center justify-between">
+               <span className="text-[10px] font-black uppercase text-gray-500">Vote Anonymously?</span>
+               <button 
+                onClick={() => setPendingVote({...pendingVote, isAnonymous: !pendingVote.isAnonymous})}
+                className={`w-12 h-6 rounded-full transition-all relative ${pendingVote.isAnonymous ? 'bg-indigo-600' : 'bg-gray-300'}`}
+               >
+                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${pendingVote.isAnonymous ? 'left-7' : 'left-1'}`}></div>
+               </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button onClick={confirmVote} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg">Submit Vote</button>
+              <button onClick={() => setPendingVote(null)} className="w-full py-4 text-gray-400 font-black uppercase text-[10px]">Cancel</button>
+            </div>
           </div>
-          <button 
-            onClick={() => {
-              setCurrentPage('board');
-              setSelectedCategory(null);
-            }} 
-            className={`flex items-center text-xs md:text-xl font-bold tracking-tight transition-all py-1 px-1.5 border-b-4 rounded-t-sm ${currentPage === 'board' ? 'text-gray-900 border-indigo-600' : 'text-gray-400 border-transparent hover:text-gray-900'}`}
-          >
-            <i className="fa-solid fa-envelope mr-1 md:mr-3 text-base md:text-lg"></i>
-            <span className="hidden sm:inline">Let's Talk</span>
-          </button>
         </div>
-        <div className="flex gap-1 md:gap-2 items-center">
-          {user ? (
-            <div className="flex items-center gap-1 md:gap-3">
-              <span className="text-[8px] md:text-xs font-black text-gray-600 uppercase tracking-tighter hidden sm:inline">Hi, {user.user_metadata?.full_name?.split(' ')[0]}</span>
-              <button onClick={async () => { await supabase.auth.signOut(); showToast("Logged out"); }} className="text-[7px] md:text-[9px] font-black uppercase text-red-500 border border-red-100 px-1.5 py-1 rounded-lg hover:bg-red-50 transition">Logout</button>
-            </div>
-          ) : (
-            <div className="flex gap-1 items-center">
-              <button onClick={() => setCurrentPage('login')} className="text-gray-600 px-1.5 md:px-3 py-1 rounded-lg font-black text-[7px] md:text-[10px] uppercase tracking-widest hover:bg-gray-100 transition">Login</button>
-              <button onClick={() => setCurrentPage('signup')} className="bg-indigo-600 text-white px-2 md:px-3 py-1 rounded-lg font-black text-[7px] md:text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition shadow-md">Register</button>
-            </div>
+      )}
+
+      {/* --- MAIN NAVIGATION --- */}
+      <nav className="bg-white shadow-sm px-4 py-3 z-50 shrink-0 border-b border-gray-100 flex justify-between items-center">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center cursor-pointer" onClick={() => { setCurrentPage('home'); setSelectedCategory(null); }}>
+            <i className="fa-solid fa-landmark text-indigo-600 text-xl mr-2"></i>
+            <span className="text-lg font-bold uppercase tracking-tighter text-gray-900">Finance Hub</span>
+          </div>
+          <div className="hidden md:flex gap-8">
+            <button onClick={() => { setCurrentPage('home'); setSelectedCategory(null); }} className={`text-[10px] font-black uppercase tracking-widest ${currentPage === 'home' ? 'text-indigo-600' : 'text-gray-400'}`}>Home</button>
+            <button onClick={() => { setCurrentPage('polls'); setSelectedPoll(null); fetchPolls(); }} className={`text-[10px] font-black uppercase tracking-widest ${currentPage === 'polls' ? 'text-indigo-600' : 'text-gray-400'}`}>Polls</button>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {!user && (
+             <button onClick={() => setCurrentPage('login')} className="md:hidden bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase">Sign In</button>
           )}
+          <button onClick={() => setIsMenuOpen(true)} className="bg-gray-100 p-2.5 rounded-xl text-gray-600 hover:bg-indigo-50 hover:text-indigo-600 transition-all shadow-sm">
+            <i className="fa-solid fa-bars-staggered"></i>
+          </button>
         </div>
       </nav>
 
-      <main className="flex-grow overflow-hidden container mx-auto px-4 flex flex-col pt-4 relative">
-        {currentPage === 'home' && !selectedCategory && (
-          <div className="max-w-5xl mx-auto w-full h-full flex flex-col pt-2 md:justify-center overflow-y-auto custom-scrollbar scroll-smooth">
-            <header className="mb-4 md:mb-8 text-center shrink-0">
-              <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-2 md:px-3 py-1 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest mb-2 md:mb-4">
-                <i className="fa-solid fa-globe"></i> Transparency Portal
+      {/* --- SLIDE-OUT MEGA MENU --- */}
+      {isMenuOpen && (
+        <div className="fixed inset-0 z-[100] flex justify-end">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onClick={() => setIsMenuOpen(false)}></div>
+          <div className="relative w-80 bg-white h-full shadow-2xl p-8 flex flex-col animate-slide-in">
+            <button onClick={() => setIsMenuOpen(false)} className="self-end text-gray-300 hover:text-red-500 mb-8 transition-colors"><i className="fa-solid fa-xmark text-2xl"></i></button>
+            <div className="space-y-8">
+              <div className="space-y-4">
+                <p className="text-[10px] font-black uppercase text-gray-400 tracking-[0.2em] border-b pb-2">Community Tools</p>
+                <button onClick={() => { setCurrentPage('board'); setIsMenuOpen(false); fetchBoardMessages(); }} className="flex items-center gap-4 text-xl font-black uppercase text-gray-800 hover:text-indigo-600 transition-all">
+                  <i className="fa-solid fa-comments w-6 text-indigo-600"></i> Let's Talk
+                </button>
+                <button onClick={() => { setCurrentPage('suggestions'); setIsMenuOpen(false); fetchSuggestions(); }} className="flex items-center gap-4 text-xl font-black uppercase text-gray-800 hover:text-indigo-600 transition-all">
+                  <i className="fa-solid fa-lightbulb w-6 text-yellow-500"></i> Suggestions
+                </button>
               </div>
-              <h1 className="text-2xl md:text-6xl font-black mb-1 md:mb-3 text-gray-900 uppercase tracking-tighter leading-none">Oops Transparency</h1>
-              <p className="text-gray-500 text-[10px] md:text-xl max-w-2xl mx-auto px-4">Finance hub for Metro Lynchburg/Moore County.</p>
-            </header>
-            
-            {/* GRID FIX: Ensures all 4 categories are visible via scrolling */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 pb-20">
-              {CATEGORIES.map(cat => (
-                <div key={cat.id} onClick={() => setSelectedCategory(cat.id)} className="bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-sm border border-gray-100 hover:shadow-2xl transition-all cursor-pointer group flex items-start gap-4 md:gap-6 hover:-translate-y-1">
-                  <div className={`${cat.color} w-10 h-10 md:w-16 md:h-16 shrink-0 rounded-[1rem] md:rounded-[1.5rem] flex items-center justify-center text-white shadow-xl relative z-10 group-hover:rotate-6 transition-transform`}>
-                    <i className={`fa-solid ${cat.icon} text-lg md:text-2xl`}></i>
+
+              {profile?.is_admin && (
+                <div className="space-y-4">
+                  <p className="text-[10px] font-black uppercase text-red-400 tracking-[0.2em] border-b border-red-50 pb-2">Oversight</p>
+                  <button onClick={() => { setCurrentPage('admin'); setIsMenuOpen(false); fetchUsers(); }} className="flex items-center gap-4 text-xl font-black uppercase text-red-600 hover:scale-105 transition-all">
+                    <i className="fa-solid fa-shield-halved w-6"></i> Admin Center
+                  </button>
+                </div>
+              )}
+
+              <hr className="border-gray-50" />
+              
+              {user ? (
+                <div className="space-y-4 mt-auto">
+                  <div className="p-5 bg-indigo-50/50 rounded-3xl border border-indigo-100">
+                    <p className="text-[9px] font-black uppercase text-indigo-400 mb-1">Citizen Identity</p>
+                    <p className="text-sm font-black text-gray-900">{profile?.full_name}</p>
+                    <p className="text-[9px] font-black uppercase text-gray-500">District {profile?.district} Voter</p>
                   </div>
-                  <div className="overflow-hidden">
-                    <h3 className="text-base md:text-xl font-black text-gray-800 mb-0.5 uppercase tracking-tight truncate">{cat.label}</h3>
-                    <p className="text-gray-400 text-[9px] md:text-sm leading-snug">View {cat.label.toLowerCase()} records.</p>
+                  <button onClick={handleLogout} className="w-full py-4 border-2 border-red-100 text-red-500 rounded-2xl font-black uppercase text-xs hover:bg-red-50 transition-colors">Logout</button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                   <button onClick={() => { setCurrentPage('signup'); setIsMenuOpen(false); }} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg">Join the Registry</button>
+                   <button onClick={() => { setCurrentPage('login'); setIsMenuOpen(false); }} className="w-full py-4 bg-gray-50 text-gray-500 rounded-2xl font-black uppercase text-xs">Sign In</button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- CONTENT AREA --- */}
+      <main className="flex-grow overflow-y-auto container mx-auto px-4 py-8 custom-scrollbar">
+        
+        {/* HOME / DASHBOARD CATEGORIES */}
+        {currentPage === 'home' && !selectedCategory && (
+          <div className="max-w-4xl mx-auto space-y-12 py-10">
+            <header className="text-center space-y-4">
+               <h1 className="text-4xl md:text-6xl font-black text-gray-900 uppercase tracking-tighter leading-none">Moore Transparency</h1>
+               <p className="text-gray-500 text-lg md:text-xl font-medium">Verified citizen records & county budget oversight.</p>
+            </header>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               {CATEGORIES.map(cat => (
+                 <div key={cat.id} onClick={() => setSelectedCategory(cat.id)} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 hover:shadow-xl transition-all cursor-pointer flex items-center gap-6 group">
+                   <div className={`${cat.color} w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg group-hover:scale-110 transition-transform`}>
+                     <i className={`fa-solid ${cat.icon}`}></i>
+                   </div>
+                   <div className="text-left">
+                     <h3 className="text-xl font-black text-gray-800 uppercase leading-none mb-1">{cat.label}</h3>
+                     <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Review Logs</p>
+                   </div>
+                 </div>
+               ))}
+            </div>
+          </div>
+        )}
+
+        {/* DASHBOARDS LISTING */}
+        {currentPage === 'home' && selectedCategory && (
+          <div className="max-w-5xl mx-auto space-y-8">
+            <button onClick={() => setSelectedCategory(null)} className="text-[10px] font-black uppercase text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-2">
+              <i className="fa-solid fa-arrow-left"></i> Back to Categories
+            </button>
+            <h2 className="text-3xl font-black uppercase tracking-tighter">{selectedCategory} Dashboards</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {DASHBOARDS.filter(d => d.category === selectedCategory).map(dash => (
+                <div key={dash.id} onClick={() => setActiveDashboard(dash)} className="bg-white p-8 rounded-[2rem] border border-gray-100 hover:shadow-xl transition-all cursor-pointer group flex flex-col">
+                  <h4 className="text-lg font-black text-gray-800 uppercase mb-2 leading-tight">{dash.title}</h4>
+                  <p className="text-gray-400 text-xs mb-6 leading-relaxed line-clamp-3">{dash.description}</p>
+                  <div className="mt-auto pt-6 border-t border-gray-50 flex justify-between items-center">
+                    <span className="text-indigo-600 text-[10px] font-black uppercase">Open Analysis</span>
+                    <i className="fa-solid fa-arrow-right text-indigo-200 group-hover:translate-x-2 transition-transform"></i>
                   </div>
                 </div>
               ))}
@@ -285,254 +484,254 @@ export default function App() {
           </div>
         )}
 
-        {currentPage === 'home' && selectedCategory && (
-          <div className="flex flex-col h-full overflow-hidden">
-             <div className="flex items-center gap-2 mb-3 shrink-0">
-               <button onClick={goHome} className="text-indigo-600 font-black text-[9px] md:text-[10px] uppercase tracking-widest hover:underline flex items-center gap-1">
-                 <i className="fa-solid fa-house"></i> Home
-               </button>
-               <span className="text-gray-300 text-[9px]">/</span>
-               <span className="text-gray-400 font-black text-[9px] uppercase tracking-widest">{selectedCategory}</span>
-             </div>
-             <div className="flex-grow overflow-y-auto space-y-12 pb-12 pr-1 custom-scrollbar">
-                <section>
-                  <div className="mb-6">
-                    <h2 className="text-xl md:text-3xl font-black text-gray-900 uppercase tracking-tighter">{selectedCategory} Dashboards</h2>
+        {/* POLLS LIST */}
+        {currentPage === 'polls' && !selectedPoll && (
+          <div className="max-w-4xl mx-auto space-y-8">
+            <h2 className="text-4xl font-black uppercase tracking-tighter">Community Polls</h2>
+            <div className="grid grid-cols-1 gap-6">
+              {polls.map(poll => {
+                const voted = poll.poll_votes?.some((v: any) => v.user_id === user?.id);
+                return (
+                  <div key={poll.id} onClick={() => setSelectedPoll(poll)} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 hover:shadow-lg transition-all cursor-pointer flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                    <div className="space-y-1">
+                      <h3 className="text-2xl font-black uppercase tracking-tight text-gray-900">{poll.title}</h3>
+                      <p className={`${voted ? 'text-indigo-600' : 'text-gray-400'} font-bold text-[10px] uppercase tracking-widest flex items-center gap-2`}>
+                        {voted && <i className="fa-solid fa-circle-check"></i>}
+                        {poll.poll_votes?.length || 0} Votes Recorded
+                      </p>
+                    </div>
+                    <button className={`px-8 py-4 rounded-xl font-black uppercase text-[10px] w-full sm:w-auto shadow-sm ${voted ? 'bg-gray-100 text-gray-500' : 'bg-indigo-600 text-white'}`}>
+                      {voted ? 'View Discussion' : 'Vote & Discuss'}
+                    </button>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                    {DASHBOARDS.filter(d => d.category === selectedCategory).map(dash => (
-                      <div key={dash.id} onClick={() => setActiveDashboard(dash)} className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 hover:shadow-xl transition-all cursor-pointer group relative overflow-hidden">
-                         <div className="flex justify-between items-start mb-4">
-                           <span className="text-[7px] md:text-[8px] font-black uppercase tracking-widest bg-gray-50 text-gray-400 px-2 py-1 rounded-lg border border-gray-100">{dash.status || 'Official'}</span>
-                         </div>
-                         <h4 className="text-base md:text-xl font-black text-gray-800 mb-2 uppercase tracking-tight group-hover:text-indigo-600 transition-colors leading-tight">{dash.title}</h4>
-                         <p className="text-gray-400 text-[9px] md:text-xs leading-relaxed mb-6 line-clamp-2">{dash.description}</p>
-                         <span className="text-indigo-600 text-[9px] font-black uppercase tracking-widest flex items-center gap-2">
-                           View Data <i className="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
-                         </span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-             </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
-        {currentPage === 'board' && (
-          <div className="flex h-full gap-8 overflow-hidden pb-8 relative">
-            {/* MOBILE DRAWER: Slides from left */}
-            <aside className={`
-              fixed md:relative top-0 left-0 h-full w-[85%] md:w-80 z-[60] 
-              transform transition-transform duration-300 ease-in-out
-              ${isArchiveOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}
-              bg-white flex flex-col rounded-r-[2rem] md:rounded-[2rem] border-r md:border border-gray-100 shrink-0
-            `}>
-              <div className="p-6 border-b border-gray-50 bg-indigo-50/30 flex justify-between items-center">
-                <h2 className="text-[10px] md:text-sm font-black uppercase tracking-widest text-indigo-900 flex items-center gap-2">
-                  <i className="fa-solid fa-box-archive"></i> Message Archive
-                </h2>
-                <button onClick={() => setIsArchiveOpen(false)} className="md:hidden text-indigo-900 bg-white/50 w-8 h-8 rounded-full flex items-center justify-center shadow-sm">
-                  <i className="fa-solid fa-xmark text-lg"></i>
-                </button>
-              </div>
-              <div className="p-4 bg-indigo-50/10 shrink-0">
-                <div className="relative">
-                  <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 text-xs"></i>
-                  <input 
-                    type="text" 
-                    placeholder="Search history..." 
-                    className="w-full pl-10 pr-4 py-2.5 bg-white rounded-xl text-[10px] font-bold border border-transparent focus:border-indigo-200 outline-none transition-all shadow-sm"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
+        {/* SINGLE POLL DETAIL */}
+        {currentPage === 'polls' && selectedPoll && (
+          <div className="max-w-4xl mx-auto space-y-8 pb-20">
+            <button onClick={() => setSelectedPoll(null)} className="text-[10px] font-black uppercase text-gray-400 hover:text-indigo-600 flex items-center gap-2 transition-all">
+              <i className="fa-solid fa-arrow-left"></i> All Polls
+            </button>
+            <div className="bg-white p-6 md:p-10 rounded-[3rem] shadow-xl border border-gray-100 space-y-10">
+              <div className="space-y-4">
+                <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter leading-none text-gray-900">{selectedPoll.title}</h2>
+                <div className="text-gray-600 text-sm md:text-base leading-relaxed border-l-4 border-indigo-100 pl-6 py-2">
+                  {renderTextWithLinks(selectedPoll.description)}
                 </div>
               </div>
-              <div className="flex-grow overflow-y-auto p-4 custom-scrollbar space-y-3 pb-20">
-                {filteredMessages.length > 0 ? filteredMessages.map(msg => (
-                  <div key={`archive-${msg.id}`} className="p-3.5 rounded-2xl hover:bg-gray-50 transition-colors cursor-pointer border border-transparent hover:border-indigo-50 group" 
-                    onClick={() => {
-                      document.getElementById(`msg-${msg.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      if (window.innerWidth < 768) setIsArchiveOpen(false);
-                    }}>
+
+              <div className="space-y-4">
+                {selectedPoll.poll_options?.map((opt: any) => {
+                  const votes = selectedPoll.poll_votes?.filter((v: any) => v.option_id === opt.id) || [];
+                  const totalVotes = selectedPoll.poll_votes?.length || 0;
+                  const percent = totalVotes ? Math.round((votes.length / totalVotes) * 100) : 0;
+                  const hasVotedThis = votes.some((v: any) => v.user_id === user?.id);
+                  const hasVotedAny = selectedPoll.poll_votes?.some((v: any) => v.user_id === user?.id);
+                  
+                  return (
+                    <div key={opt.id} className="space-y-3">
+                      <button 
+                        onClick={() => initiateVote(selectedPoll.id, opt.id, opt.text)} 
+                        className={`w-full text-left p-6 rounded-2xl border-2 relative overflow-hidden transition-all group ${hasVotedThis ? 'border-indigo-600 bg-indigo-50/20' : 'border-gray-50 hover:border-indigo-200'}`}
+                      >
+                        {hasVotedAny && (
+                          <div className="absolute inset-y-0 left-0 bg-indigo-600/5 transition-all duration-700" style={{ width: `${percent}%` }}></div>
+                        )}
+                        <div className="relative flex justify-between items-center">
+                          <span className="text-[11px] md:text-xs font-black uppercase text-gray-700 flex items-center gap-3">
+                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${hasVotedThis ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300'}`}>
+                              {hasVotedThis && <i className="fa-solid fa-check text-white text-[8px]"></i>}
+                            </div>
+                            {opt.text}
+                          </span>
+                          {hasVotedAny && <span className="text-xs font-black text-indigo-600">{percent}%</span>}
+                        </div>
+                      </button>
+                      
+                      {hasVotedAny && votes.length > 0 && (
+                        <div className="flex flex-wrap gap-2 px-2">
+                          {votes.map((v: any, idx: number) => (
+                            <span key={idx} className="text-[8px] font-black uppercase bg-gray-100 text-gray-500 px-3 py-1 rounded-full border border-gray-200">
+                              {v.is_anonymous ? 'Anonymous' : (v.profiles?.full_name || 'Voter')} • Dist {v.profiles?.district || '?'}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="pt-10 border-t border-gray-100">
+                <h3 className="text-[10px] font-black uppercase text-gray-400 mb-8 tracking-[0.2em]">Verified Voter Discussion</h3>
+                {renderComments(selectedPoll.poll_comments || [], selectedPoll.id)}
+                
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!user) return setCurrentPage('login');
+                  const fd = new FormData(e.currentTarget);
+                  const { error } = await supabase!.from('poll_comments').insert({ 
+                    poll_id: selectedPoll.id, 
+                    user_id: user.id, 
+                    content: fd.get('content') 
+                  });
+                  if (error) showToast(error.message, 'error');
+                  else { (e.target as HTMLFormElement).reset(); fetchPolls(); }
+                }} className="mt-10 flex flex-col sm:flex-row gap-3">
+                  <input name="content" required placeholder="Add your perspective..." className="flex-grow p-5 bg-gray-50 rounded-2xl font-bold text-sm outline-none border border-transparent focus:border-indigo-100 transition-all" />
+                  <button type="submit" className="bg-indigo-600 text-white px-8 py-5 rounded-2xl font-black uppercase text-[10px] shadow-lg hover:bg-indigo-700">Post Comment</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MESSAGE BOARD ("LET'S TALK") */}
+        {currentPage === 'board' && (
+          <div className="flex h-full gap-8 overflow-hidden relative">
+            {/* Archive Sidebar */}
+            <aside className={`fixed md:relative top-0 left-0 h-full w-[85%] md:w-80 z-[60] transform transition-transform duration-300 ease-in-out ${isArchiveOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} bg-white border-r border-gray-100 p-6 flex flex-col shadow-2xl md:shadow-none`}>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-[10px] font-black uppercase tracking-widest text-indigo-900 flex items-center gap-2">
+                  <i className="fa-solid fa-box-archive"></i> Message Archive
+                </h2>
+                <button onClick={() => setIsArchiveOpen(false)} className="md:hidden text-indigo-900 bg-gray-50 w-8 h-8 rounded-full flex items-center justify-center">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+              <div className="relative mb-6">
+                <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 text-xs"></i>
+                <input 
+                  type="text" 
+                  placeholder="Search history..." 
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-xl text-[10px] font-bold outline-none border border-transparent focus:border-indigo-100 transition-all"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <div className="flex-grow overflow-y-auto space-y-3 custom-scrollbar">
+                {filteredMessages.map(msg => (
+                  <div key={`arch-${msg.id}`} className="p-4 rounded-2xl hover:bg-indigo-50/50 cursor-pointer border border-transparent hover:border-indigo-50 transition-all group">
                     <div className="flex justify-between items-center mb-1">
-                      <span className="text-[8px] font-black uppercase text-indigo-600 truncate max-w-[100px]">{msg.to}</span>
-                      <span className="text-[6px] font-bold text-gray-300 uppercase">{msg.date}</span>
+                      <span className="text-[8px] font-black uppercase text-indigo-600 truncate max-w-[120px]">To: {msg.recipient_names}</span>
+                      <span className="text-[6px] font-bold text-gray-300 uppercase">{new Date(msg.created_at).toLocaleDateString()}</span>
                     </div>
-                    <p className="text-[9px] font-medium text-gray-500 line-clamp-1 italic">"{msg.text}"</p>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="text-[7px] font-black text-gray-800 uppercase tracking-tight">{msg.user}</span>
-                      {msg.response && <i className="fa-solid fa-circle-check text-[7px] text-green-500"></i>}
-                    </div>
+                    <p className="text-[9px] font-medium text-gray-500 line-clamp-1 italic">"{msg.content}"</p>
                   </div>
-                )) : (
-                  <div className="text-center py-10">
-                    <i className="fa-solid fa-ghost text-gray-200 text-3xl mb-3"></i>
-                    <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No history</p>
-                  </div>
-                )}
+                ))}
               </div>
             </aside>
 
-            {/* DARK OVERLAY: Tap to close drawer */}
-            {isArchiveOpen && (
-              <div 
-                className="fixed inset-0 bg-indigo-900/40 backdrop-blur-sm z-[55] md:hidden transition-opacity"
-                onClick={() => setIsArchiveOpen(false)}
-              ></div>
-            )}
-
-            {/* MAIN BOARD: Takes up full width on mobile */}
-            <div className="flex-grow flex flex-col items-center overflow-hidden w-full px-1 md:px-0">
-               <div className="w-full max-w-2xl flex-grow overflow-y-auto space-y-6 md:space-y-10 pb-12 pr-1 md:pr-4 custom-scrollbar">
+            {/* Main Board Area */}
+            <div className="flex-grow flex flex-col items-center overflow-hidden">
+               <div className="w-full max-w-2xl space-y-10 pb-20 overflow-y-auto custom-scrollbar pr-2">
                   <section>
-                    <div className="flex items-center justify-between mb-4 md:mb-8 sticky top-0 bg-gray-50/95 backdrop-blur-md py-4 z-10">
-                      <div className="flex flex-col md:flex-row md:items-center gap-1">
-                        <h2 className="text-xl md:text-3xl font-black text-gray-900 uppercase tracking-tighter leading-tight">Message Board</h2>
-                        <span className="bg-indigo-600 text-white text-[6px] md:text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-md w-fit">Public</span>
-                      </div>
-                      
-                      {/* HISTORY BUTTON: Visible only on phones */}
-                      <button 
-                        onClick={() => setIsArchiveOpen(true)}
-                        className="md:hidden flex items-center gap-1.5 bg-white border border-indigo-100 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest text-indigo-600 shadow-sm hover:bg-indigo-50 transition-all"
-                      >
-                        <i className="fa-solid fa-clock-rotate-left"></i> History
+                    <div className="flex items-center justify-between mb-8 sticky top-0 bg-gray-50/95 backdrop-blur-md py-4 z-10">
+                      <h2 className="text-3xl font-black uppercase tracking-tighter text-gray-900 leading-none">Message Board</h2>
+                      <button onClick={() => setIsArchiveOpen(true)} className="md:hidden bg-white px-4 py-2 rounded-xl border border-indigo-100 text-[9px] font-black uppercase text-indigo-600 shadow-sm">
+                        <i className="fa-solid fa-clock-rotate-left mr-1"></i> History
                       </button>
                     </div>
-                    
-                    {user && (
-                      <div className="mb-6 md:mb-12 bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[3rem] shadow-xl border border-indigo-50">
-                         <h3 className="text-[9px] md:text-sm font-black uppercase text-indigo-600 mb-4 md:mb-6 flex items-center gap-2">
-                           <i className="fa-solid fa-paper-plane"></i> Message Your Officials
+
+                    {user ? (
+                      <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-indigo-50 mb-12">
+                         <h3 className="text-xs font-black uppercase text-indigo-600 mb-6 flex items-center gap-2">
+                           <i className="fa-solid fa-paper-plane"></i> Message Officials
                          </h3>
-                         <form onSubmit={handlePostMessage} className="space-y-4 md:space-y-6">
-                          <div className="space-y-2">
-                            <label className="text-[8px] md:text-[10px] font-black uppercase text-gray-400 ml-1">1. Notify Officials</label>
-                            
-                            <div className="relative">
+                         <form onSubmit={handlePostBoardMessage} className="space-y-6">
+                           <div className="relative">
+                              <label className="text-[9px] font-black uppercase text-gray-400 mb-2 block ml-1">1. Choose Recipients</label>
                               <button 
-                                type="button"
-                                onClick={() => setIsOfficialDropdownOpen(!isOfficialDropdownOpen)}
-                                className="w-full bg-gray-50 p-3.5 rounded-2xl flex justify-between items-center text-[10px] md:text-sm font-bold text-gray-700 border-2 border-transparent focus:border-indigo-100 transition-all shadow-inner"
+                                type="button" 
+                                onClick={() => setIsOfficialDropdownOpen(!isOfficialDropdownOpen)} 
+                                className="w-full bg-gray-50 p-4 rounded-2xl flex justify-between items-center text-xs font-bold text-gray-700 border-2 border-transparent focus:border-indigo-100 transition-all shadow-inner"
                               >
-                                <div className="flex items-center gap-2">
-                                   <i className="fa-solid fa-users-rectangle text-indigo-400"></i>
-                                   <span className="truncate max-w-[140px] md:max-w-none">{selectedOfficials.length === 0 ? '-- Choose --' : `${selectedOfficials.length} Selected`}</span>
-                                </div>
-                                <i className={`fa-solid fa-chevron-${isOfficialDropdownOpen ? 'up' : 'down'} text-[9px] text-indigo-300`}></i>
+                                <span className="truncate">{selectedOfficials.length ? `${selectedOfficials.length} Selected` : '-- Select Officials --'}</span>
+                                <i className={`fa-solid fa-chevron-${isOfficialDropdownOpen ? 'up' : 'down'} text-[10px] text-indigo-300`}></i>
                               </button>
                               
                               {isOfficialDropdownOpen && (
-                                <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-3xl shadow-2xl border border-gray-100 z-[70] max-h-72 md:max-h-96 flex flex-col overflow-hidden">
-                                  <div className="flex-grow overflow-y-auto p-3 space-y-4 custom-scrollbar">
-                                    {['Courthouse', 'Non-Courthouse', 'Council Members'].map(cat => (
-                                      <div key={cat} className="space-y-2">
-                                        <h4 className="text-[7px] font-black uppercase text-indigo-300 tracking-widest px-1">{cat}</h4>
-                                        <div className="grid grid-cols-1 gap-1">
-                                          {OFFICIALS.filter(o => o.category === cat).map(o => (
-                                            <label key={o.id} className="flex items-center gap-3 p-2.5 hover:bg-indigo-50 rounded-2xl cursor-pointer group transition-colors">
-                                              <input 
-                                                type="checkbox" 
-                                                className="w-4 h-4 rounded border-gray-200 text-indigo-600 focus:ring-indigo-500 transition-all cursor-pointer shrink-0" 
-                                                checked={selectedOfficials.includes(o.name)}
-                                                onChange={() => toggleOfficial(o.name)}
-                                              />
-                                              <div className="flex flex-col min-w-0">
-                                                <span className="text-[9px] font-black text-gray-800 group-hover:text-indigo-900 uppercase tracking-tight truncate">{o.name}</span>
-                                                <span className="text-[7px] font-bold text-gray-400 truncate">{o.office}</span>
-                                              </div>
-                                            </label>
-                                          ))}
-                                        </div>
+                                <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-3xl shadow-2xl border border-gray-100 p-4 z-[70] max-h-72 overflow-y-auto custom-scrollbar">
+                                  {OFFICIALS.map(o => (
+                                    <label key={o.id} className="flex items-center gap-4 p-3 hover:bg-indigo-50/50 rounded-xl cursor-pointer group transition-colors">
+                                      <input 
+                                        type="checkbox" 
+                                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer" 
+                                        checked={selectedOfficials.includes(o.name)} 
+                                        onChange={() => setSelectedOfficials(prev => prev.includes(o.name) ? prev.filter(n => n !== o.name) : [...prev, o.name])}
+                                      />
+                                      <div className="flex flex-col">
+                                        <span className="text-[10px] font-black text-gray-800 uppercase tracking-tight">{o.name}</span>
+                                        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{o.office}</span>
                                       </div>
-                                    ))}
-                                  </div>
-                                  <div className="p-3 bg-gray-50 border-t border-gray-100 flex justify-center">
-                                     <button 
-                                       type="button" 
-                                       onClick={() => setIsOfficialDropdownOpen(false)}
-                                       className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg"
-                                     >
-                                       Done Selecting
-                                     </button>
-                                  </div>
+                                    </label>
+                                  ))}
+                                  <button type="button" onClick={() => setIsOfficialDropdownOpen(false)} className="w-full mt-4 bg-indigo-600 text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Confirm Selection</button>
                                 </div>
                               )}
-                            </div>
-                          </div>
+                           </div>
 
-                          <div className="space-y-1.5">
-                            <label className="text-[8px] md:text-[10px] font-black uppercase text-gray-400 ml-1">2. Message Content</label>
-                            <textarea 
-                              value={newMessage}
-                              onChange={(e) => setNewMessage(e.target.value)}
-                              placeholder="Type your message for public record..." 
-                              className="w-full h-24 md:h-32 bg-gray-50 rounded-[1.2rem] md:rounded-3xl p-4 md:p-6 outline-none resize-none font-bold text-xs md:text-base text-gray-700 placeholder:text-gray-300 border-2 border-transparent focus:border-indigo-100 transition-all shadow-inner"
-                            />
-                          </div>
+                           <div className="space-y-2">
+                             <label className="text-[9px] font-black uppercase text-gray-400 block ml-1">2. Public Message</label>
+                             <textarea name="content" required placeholder="Type your message for public record..." className="w-full h-32 bg-gray-50 rounded-[1.5rem] p-6 text-sm font-bold text-gray-700 outline-none border-2 border-transparent focus:border-indigo-100 transition-all shadow-inner" />
+                           </div>
 
-                          <div className="flex flex-col xs:flex-row justify-between items-center gap-3">
-                             <button type="button" onClick={() => setIsAnonymous(!isAnonymous)} className="flex items-center gap-2.5 group">
-                                <div className={`w-9 h-5 rounded-full p-0.5 transition-colors relative ${isAnonymous ? 'bg-indigo-600' : 'bg-gray-200'}`}>
-                                  <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform transform ${isAnonymous ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                             <label className="flex items-center gap-3 cursor-pointer group">
+                                <input type="checkbox" name="isAnon" className="hidden" />
+                                <div className="w-10 h-6 bg-gray-200 rounded-full p-1 transition-colors relative group-has-[:checked]:bg-indigo-600">
+                                   <div className="w-4 h-4 bg-white rounded-full shadow-md transition-transform transform translate-x-0 group-has-[:checked]:translate-x-4"></div>
                                 </div>
-                                <span className="text-[8px] font-black uppercase text-gray-400">Post Anonymously</span>
-                             </button>
-                             <button type="submit" className="w-full xs:w-auto bg-indigo-600 text-white px-7 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-[9px] md:text-xs uppercase tracking-widest hover:shadow-2xl transition-all">Notify Officials</button>
-                          </div>
+                                <span className="text-[9px] font-black uppercase text-gray-400">Post Anonymously</span>
+                             </label>
+                             <button type="submit" className="w-full sm:w-auto bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl hover:bg-indigo-700 transition-all">Publish Message</button>
+                           </div>
                          </form>
+                      </div>
+                    ) : (
+                      <div className="bg-white p-10 rounded-[3rem] text-center border border-dashed border-indigo-200 mb-12">
+                         <div className="w-16 h-16 bg-indigo-50 text-indigo-300 rounded-full flex items-center justify-center mx-auto mb-6 text-2xl"><i className="fa-solid fa-user-lock"></i></div>
+                         <h3 className="text-xl font-black uppercase text-gray-900 mb-2">Verified Portal</h3>
+                         <p className="text-gray-400 text-xs mb-8">Access restricted to registered Moore County voters.</p>
+                         <button onClick={() => setCurrentPage('signup')} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] shadow-lg">Join the Registry</button>
                       </div>
                     )}
 
-                    <div className="relative">
-                      <div className={`space-y-6 md:space-y-10 transition-all ${!user ? 'blur-md select-none opacity-40 pointer-events-none' : ''}`}>
-                        {filteredMessages.map(msg => (
-                          <div key={msg.id} id={`msg-${msg.id}`} className="flex flex-col gap-3 md:gap-5 group">
-                            <div className="bg-white p-5 md:p-8 rounded-[1.5rem] md:rounded-[3rem] shadow-sm border border-gray-100 relative transition-all group-hover:shadow-md">
-                              <div className="flex justify-between items-start mb-3 md:mb-5">
-                                <span className="text-[7px] md:text-[10px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-50/50 px-2 md:px-3 py-1 rounded-xl truncate max-w-[150px] md:max-w-[200px]">To: {msg.to}</span>
-                                <span className="text-[7px] md:text-[9px] text-gray-400 font-bold uppercase tracking-widest whitespace-nowrap ml-2">{msg.date}</span>
-                              </div>
-                              <p className="text-gray-800 text-xs md:text-base italic leading-relaxed mb-5 md:mb-8">"{msg.text}"</p>
-                              <div className="pt-4 md:pt-5 border-t border-gray-50 flex justify-between items-center">
-                                 <div className="flex flex-col min-w-0">
-                                   <span className="text-[9px] md:text-xs font-black uppercase text-gray-900 tracking-tight truncate">{msg.user}</span>
-                                   <span className="text-[7px] md:text-[8px] font-black text-gray-400 uppercase tracking-widest truncate">{msg.district} Voter</span>
-                                 </div>
-                                 <i className="fa-solid fa-quote-right text-indigo-50 text-lg md:text-2xl group-hover:text-indigo-100 transition-colors"></i>
-                              </div>
-                            </div>
-                            {msg.response ? (
-                              <div className="ml-5 md:ml-12 bg-blue-50/40 p-5 md:p-8 rounded-[1.5rem] md:rounded-[3rem] border-l-8 border-blue-500 relative shadow-sm">
-                                 <div className="flex items-center gap-2 mb-3">
-                                   <span className="bg-blue-600 text-white text-[6px] md:text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm">Reply</span>
-                                   <span className="text-[8px] md:text-[10px] font-black text-blue-900 uppercase tracking-tighter truncate max-w-[140px]">{msg.response.author}</span>
-                                 </div>
-                                 <p className="text-blue-900 text-[10px] md:text-sm font-semibold leading-relaxed">"{msg.response.text}"</p>
-                                 <span className="absolute bottom-2 right-4 text-[6px] md:text-[8px] font-black text-blue-300 uppercase">{msg.response.date}</span>
-                              </div>
-                            ) : (
-                              <div className="ml-8 md:ml-16 border-l-4 border-gray-100 pl-4 py-2 flex items-center gap-2">
-                                <div className="w-1 h-1 md:w-2 md:h-2 bg-gray-200 rounded-full animate-pulse"></div>
-                                <span className="text-[7px] md:text-[9px] font-black text-gray-300 uppercase tracking-[0.1em] italic">Waiting for official response</span>
-                              </div>
-                            )}
+                    <div className="space-y-10">
+                      {filteredMessages.map(msg => (
+                        <div key={msg.id} className="group">
+                          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 relative group-hover:shadow-md transition-all">
+                             <div className="flex justify-between items-start mb-6">
+                               <span className="text-[8px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full truncate max-w-[200px]">To: {msg.recipient_names}</span>
+                               <span className="text-[8px] text-gray-300 font-bold uppercase tracking-widest">{new Date(msg.created_at).toLocaleDateString()}</span>
+                             </div>
+                             <p className="text-gray-800 text-sm italic leading-relaxed mb-8">"{msg.content}"</p>
+                             <div className="pt-6 border-t border-gray-50 flex justify-between items-center">
+                                <div className="flex flex-col">
+                                  <span className="text-[10px] font-black uppercase text-gray-900 leading-none mb-1">{msg.is_anonymous ? 'Verified Citizen' : msg.profiles?.full_name}</span>
+                                  <span className="text-[8px] font-black uppercase text-gray-400 tracking-widest">Dist {msg.profiles?.district || '?'} Voter</span>
+                                </div>
+                                <i className="fa-solid fa-quote-right text-indigo-50 text-2xl"></i>
+                             </div>
                           </div>
-                        ))}
-                      </div>
-
-                      {!user && (
-                        <div className="absolute inset-0 flex items-center justify-center z-20 px-2">
-                          <div className="bg-white/95 backdrop-blur-2xl p-6 md:p-10 rounded-[2rem] md:rounded-[4rem] shadow-2xl border border-indigo-50 text-center max-w-sm">
-                            <div className="w-14 h-14 md:w-20 md:h-20 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 text-xl md:text-3xl shadow-inner animate-pulse">
-                              <i className="fa-solid fa-user-lock"></i>
+                          {msg.response_content && (
+                            <div className="ml-10 mt-4 bg-blue-50/50 p-8 rounded-[2.5rem] border-l-8 border-blue-500 relative">
+                               <div className="flex items-center gap-3 mb-3">
+                                 <span className="bg-blue-600 text-white text-[7px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm">Official Reply</span>
+                                 <span className="text-[9px] font-black text-blue-900 uppercase">{msg.response_author}</span>
+                               </div>
+                               <p className="text-blue-900 text-sm font-semibold leading-relaxed">"{msg.response_content}"</p>
+                               {msg.responded_at && (
+                                 <span className="absolute bottom-3 right-5 text-[7px] font-black text-blue-300 uppercase">{new Date(msg.responded_at).toLocaleDateString()}</span>
+                               )}
                             </div>
-                            <h3 className="text-lg md:text-2xl font-black mb-2 text-gray-900 uppercase tracking-tighter">Verified Portal</h3>
-                            <p className="text-gray-400 text-[10px] md:text-sm mb-6 leading-relaxed">Account required for official record engagement.</p>
-                            <button onClick={() => setCurrentPage('signup')} className="w-full bg-indigo-600 text-white py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-[9px] md:text-xs uppercase tracking-widest shadow-lg">Join the Registry</button>
-                          </div>
+                          )}
                         </div>
-                      )}
+                      ))}
                     </div>
                   </section>
                </div>
@@ -540,53 +739,190 @@ export default function App() {
           </div>
         )}
 
+        {/* SUGGESTION BOX */}
+        {currentPage === 'suggestions' && (
+          <div className="max-w-4xl mx-auto space-y-12">
+             <div className="bg-white p-10 rounded-[3rem] shadow-xl border-2 border-indigo-50">
+               <h2 className="text-3xl font-black uppercase text-indigo-600 mb-6">Suggestion Box</h2>
+               <form onSubmit={async (e) => {
+                 e.preventDefault();
+                 if (!user) return setCurrentPage('login');
+                 const fd = new FormData(e.currentTarget);
+                 const { error } = await supabase!.from('suggestions').insert({ 
+                   content: fd.get('content'), 
+                   is_public: fd.get('isPublic') === 'on', 
+                   user_id: user.id 
+                 });
+                 if (error) showToast(error.message, 'error');
+                 else { showToast("Thank you for your input!"); fetchSuggestions(); (e.target as any).reset(); }
+               }} className="space-y-6">
+                 <textarea name="content" required placeholder="Share an idea with local officials..." className="w-full h-40 bg-gray-50 rounded-[2rem] p-8 outline-none font-bold text-gray-700 border border-transparent focus:border-indigo-100 transition-all shadow-inner" />
+                 <div className="flex justify-between items-center">
+                   <label className="flex items-center gap-3 cursor-pointer group">
+                     <input type="checkbox" name="isPublic" defaultChecked className="hidden" />
+                     <div className="w-10 h-6 bg-gray-200 rounded-full p-1 transition-colors relative group-has-[:checked]:bg-indigo-600">
+                        <div className="w-4 h-4 bg-white rounded-full transition-transform transform translate-x-0 group-has-[:checked]:translate-x-4"></div>
+                     </div>
+                     <span className="text-[10px] font-black uppercase text-gray-400">Public visibility</span>
+                   </label>
+                   <button type="submit" className="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black uppercase text-xs shadow-lg">Submit Idea</button>
+                 </div>
+               </form>
+             </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               {suggestions.filter(s => s.is_public).map(s => (
+                 <div key={s.id} className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col justify-between">
+                   <p className="text-gray-800 font-bold mb-6 italic text-sm">"{s.content}"</p>
+                   <span className="text-[9px] font-black uppercase text-indigo-400">{s.profiles?.full_name || 'Verified Voter'} • Dist {s.profiles?.district || '?'}</span>
+                 </div>
+               ))}
+             </div>
+          </div>
+        )}
+
+        {/* AUTHENTICATION */}
         {(currentPage === 'signup' || currentPage === 'login') && (
-          <div className="max-w-lg mx-auto w-full px-1 pb-12 overflow-y-auto custom-scrollbar">
-            <div className="flex gap-1.5 mb-4 bg-gray-100 p-1 rounded-2xl shrink-0">
-              <button onClick={() => setCurrentPage('signup')} className={`flex-1 py-2 rounded-xl font-black text-[8px] md:text-[10px] uppercase tracking-widest transition ${currentPage === 'signup' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-400'}`}>1. Register</button>
-              <button onClick={() => setCurrentPage('login')} className={`flex-1 py-2 rounded-xl font-black text-[8px] md:text-[10px] uppercase tracking-widest transition ${currentPage === 'login' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-400'}`}>2. Login</button>
+          <div className="max-w-lg mx-auto w-full space-y-8 py-10">
+            <div className="flex gap-2 bg-gray-100 p-1.5 rounded-2xl">
+              <button onClick={() => setCurrentPage('signup')} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${currentPage === 'signup' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-400'}`}>1. Registry</button>
+              <button onClick={() => setCurrentPage('login')} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${currentPage === 'login' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-400'}`}>2. Sign In</button>
             </div>
+
             {currentPage === 'signup' ? (
-              <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-xl border border-gray-100">
-                <h2 className="text-lg md:text-2xl font-black text-center mb-6 text-gray-900 uppercase tracking-tighter text-indigo-600 leading-tight">Voter Verification</h2>
-                <form className="space-y-3.5" onSubmit={handleSignup}>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input name="lastName" required placeholder="LAST NAME" className="w-full p-3 bg-gray-50 rounded-xl outline-none font-bold uppercase text-[10px] md:text-xs shadow-inner" />
-                    <input name="voterId" required placeholder="VOTER ID #" className="w-full p-3 bg-gray-50 rounded-xl outline-none font-bold text-[10px] md:text-xs shadow-inner" />
+              <div className="bg-white p-8 md:p-10 rounded-[3rem] shadow-2xl border border-gray-100">
+                <header className="text-center mb-8 space-y-2">
+                  <h2 className="text-2xl font-black uppercase text-indigo-600 leading-tight">Voter Verification</h2>
+                  <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Connect your official state record</p>
+                </header>
+                <form className="space-y-4" onSubmit={handleSignup}>
+                  <div className="grid grid-cols-2 gap-4">
+                    <input name="lastName" required placeholder="LAST NAME" className="w-full p-4 bg-gray-50 rounded-xl outline-none font-bold uppercase text-[10px] shadow-inner" />
+                    <input name="voterId" required placeholder="VOTER ID #" className="w-full p-4 bg-gray-50 rounded-xl outline-none font-bold text-[10px] shadow-inner" />
                   </div>
-                  <div className="p-3.5 bg-indigo-50 rounded-2xl border border-indigo-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1">
-                       <label className="text-[7px] font-black uppercase text-indigo-300 ml-1">Birth Date</label>
-                       <input type="date" name="dob" className="w-full p-2 bg-white rounded-lg text-[9px] md:text-[10px] font-bold" />
+                  <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 space-y-4">
+                    <div className="flex flex-col gap-1.5">
+                       <label className="text-[8px] font-black uppercase text-indigo-300 ml-1">Date of Birth</label>
+                       <input type="date" name="dob" required className="w-full p-3 bg-white rounded-xl text-[10px] font-bold" />
                     </div>
-                    <div className="flex flex-col gap-1">
-                       <label className="text-[7px] font-black uppercase text-indigo-300 ml-1">Home Address</label>
-                       <input name="address" placeholder="STREET NAME" className="w-full p-2 bg-white rounded-lg text-[9px] md:text-[10px] font-bold uppercase" />
+                    <div className="flex flex-col gap-1.5">
+                       <label className="text-[8px] font-black uppercase text-indigo-300 ml-1">Street Name</label>
+                       <input name="address" required placeholder="Ex: Main St" className="w-full p-3 bg-white rounded-xl text-[10px] font-bold uppercase" />
                     </div>
                   </div>
-                  <input type="email" name="email" required placeholder="Email Address" className="w-full p-3 bg-gray-50 rounded-xl outline-none font-bold text-[10px] md:text-xs shadow-inner" />
-                  <input type="password" name="password" required placeholder="Password" className="w-full p-3 bg-gray-50 rounded-xl outline-none font-bold text-[10px] md:text-xs shadow-inner" />
-                  <button disabled={isVerifying} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-black text-[10px] md:text-sm uppercase shadow-lg">
-                    {isVerifying ? 'Verifying Identity...' : 'Register'}
+                  <input type="email" name="email" required placeholder="Email Address" className="w-full p-4 bg-gray-50 rounded-xl outline-none font-bold text-[10px] shadow-inner" />
+                  <input type="password" name="password" required placeholder="Create Password" className="w-full p-4 bg-gray-50 rounded-xl outline-none font-bold text-[10px] shadow-inner" />
+                  <button disabled={isVerifying} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-indigo-700 transition-all disabled:opacity-50">
+                    {isVerifying ? 'Validating State Records...' : 'Register Securely'}
                   </button>
                 </form>
               </div>
             ) : (
-              <div className="bg-white p-6 md:p-10 rounded-[1.5rem] md:rounded-[2.5rem] shadow-xl border border-gray-100">
-                <h2 className="text-lg md:text-2xl font-black text-center mb-6 text-gray-900 uppercase tracking-tighter text-indigo-600">Secure Access</h2>
-                <form className="space-y-3" onSubmit={handleLogin}>
-                  <input name="email" type="email" placeholder="Email Address" required className="w-full p-3.5 md:p-4 bg-gray-50 rounded-xl outline-none font-bold text-[10px] md:text-sm shadow-inner" />
-                  <input name="password" type="password" placeholder="Password" required className="w-full p-3.5 md:p-4 bg-gray-50 rounded-xl outline-none font-bold text-[10px] md:text-sm shadow-inner" />
-                  <button className="w-full bg-indigo-600 text-white py-4 rounded-xl font-black text-[10px] md:text-sm uppercase shadow-lg">Sign In</button>
+              <div className="bg-white p-8 md:p-10 rounded-[3rem] shadow-2xl border border-gray-100">
+                <header className="text-center mb-8 space-y-2">
+                  <h2 className="text-2xl font-black uppercase text-indigo-600 leading-tight">Secure Access</h2>
+                  <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Verified login only</p>
+                </header>
+                <form className="space-y-4" onSubmit={async (e) => {
+                  e.preventDefault();
+                  const fd = new FormData(e.currentTarget);
+                  const { error } = await supabase!.auth.signInWithPassword({ 
+                    email: fd.get('email') as string, 
+                    password: fd.get('password') as string 
+                  });
+                  if (error) showToast(error.message, 'error'); else setCurrentPage('home');
+                }}>
+                  <input name="email" type="email" placeholder="Email Address" required className="w-full p-4 bg-gray-50 rounded-xl outline-none font-bold text-[10px] shadow-inner" />
+                  <input name="password" type="password" placeholder="Password" required className="w-full p-4 bg-gray-50 rounded-xl outline-none font-bold text-[10px] shadow-inner" />
+                  <button className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-indigo-700 transition-all">Enter Portal</button>
                 </form>
               </div>
             )}
           </div>
         )}
+
+        {/* ADMIN DASHBOARD */}
+        {currentPage === 'admin' && profile?.is_admin && (
+           <div className="max-w-6xl mx-auto space-y-12 py-10">
+             <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+               <div>
+                 <p className="text-[10px] font-black uppercase text-red-500 tracking-[0.3em] mb-2">Internal Affairs</p>
+                 <h2 className="text-5xl font-black uppercase text-gray-900 tracking-tighter leading-none">Admin Control</h2>
+               </div>
+               <button onClick={fetchAllData} className="bg-white border border-gray-200 px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50">Sync Database</button>
+             </header>
+
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                {/* Poll Creation */}
+                <div className="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100">
+                  <h3 className="text-xl font-black uppercase mb-8 flex items-center gap-3">
+                    <i className="fa-solid fa-plus-circle text-indigo-600"></i> Deploy New Poll
+                  </h3>
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    const fd = new FormData(e.currentTarget);
+                    const options = (fd.get('options') as string).split(',').map(s => s.trim());
+                    try {
+                      const { data: poll, error: pError } = await supabase!.from('polls').insert({ 
+                        title: fd.get('title'), 
+                        description: fd.get('description'),
+                        is_anonymous_voting: fd.get('isAnon') === 'on'
+                      }).select().single();
+                      
+                      if (pError) throw pError;
+                      if (poll) {
+                        await supabase!.from('poll_options').insert(options.map(text => ({ poll_id: poll.id, text })));
+                        showToast("Poll Successfully Launched");
+                        fetchPolls();
+                        (e.target as HTMLFormElement).reset();
+                      }
+                    } catch (err: any) { showToast(err.message, 'error'); }
+                  }} className="space-y-4">
+                    <input name="title" required placeholder="Question Title" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-sm outline-none" />
+                    <textarea name="description" placeholder="Poll Details (Supports URLs)..." className="w-full p-4 bg-gray-50 rounded-xl font-bold h-24 text-sm outline-none" />
+                    <input name="options" required placeholder="Options (comma separated: Yes, No, Maybe)" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-sm outline-none" />
+                    <label className="flex items-center gap-3 px-2">
+                      <input type="checkbox" name="isAnon" /> <span className="text-[10px] font-black uppercase text-gray-400">Default to Anonymous?</span>
+                    </label>
+                    <button type="submit" className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase shadow-xl text-xs hover:bg-indigo-700 transition-all">Launch Poll to Citizens</button>
+                  </form>
+                </div>
+
+                {/* Registry Moderation */}
+                <div className="bg-gray-900 p-10 rounded-[3rem] text-white shadow-2xl">
+                  <h3 className="text-xl font-black uppercase mb-8 flex items-center gap-3">
+                    <i className="fa-solid fa-users-gear text-red-500"></i> Registry Moderation
+                  </h3>
+                  <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar-dark pr-4">
+                    {allUsers.map(u => (
+                      <div key={u.id} className="flex justify-between items-center p-5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all group">
+                        <div className="truncate pr-4">
+                          <p className="text-xs font-black uppercase truncate group-hover:text-red-400 transition-colors">{u.full_name}</p>
+                          <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest">District {u.district}</p>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                           <button 
+                            onClick={async () => {
+                              const { error } = await supabase!.from('profiles').update({ is_banned: !u.is_banned }).eq('id', u.id);
+                              if (!error) { showToast(u.is_banned ? "User Reinstated" : "User Banned"); fetchUsers(); }
+                            }}
+                            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${u.is_banned ? 'bg-red-600 text-white' : 'border border-white/20 text-gray-400 hover:border-red-500 hover:text-red-500'}`}
+                           >
+                            {u.is_banned ? 'Unban' : 'Ban Access'}
+                           </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+             </div>
+           </div>
+        )}
+
       </main>
 
-      <footer className="bg-white border-t border-gray-100 py-2 md:py-3 px-6 text-center shrink-0">
-        <p className="text-[6px] md:text-[8px] font-black text-gray-400 uppercase tracking-[0.3em]">© 2024 transparency portal • Verified public records</p>
+      {/* --- SITE FOOTER --- */}
+      <footer className="bg-white border-t border-gray-100 py-3 px-6 text-center shrink-0">
+        <p className="text-[8px] font-black text-gray-400 uppercase tracking-[0.4em]">© 2024 Moore Transparency Portal • Verified Public Records</p>
       </footer>
 
       <style>{`
@@ -598,13 +934,19 @@ export default function App() {
           border: 3px solid transparent;
           background-clip: content-box;
         }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; background-clip: content-box; }
+        .custom-scrollbar-dark::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar-dark::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
         
-        /* Fixed Grid Scrolling for Mobile */
-        @media (max-width: 640px) {
-          .xs\:inline { display: inline !important; }
-          .xs\:flex-row { flex-direction: row !important; }
+        @keyframes slide-in {
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
         }
+        @keyframes slide-up {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-slide-in { animation: slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
       `}</style>
     </div>
   );
