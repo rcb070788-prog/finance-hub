@@ -453,7 +453,7 @@ export default function App() {
         {currentPage === 'home' && !selectedCategory && (
           <div className="max-w-4xl mx-auto space-y-12 py-10">
             <header className="text-center space-y-4">
-               <h1 className="text-4xl md:text-6xl font-black text-gray-900 uppercase tracking-tighter leading-none">Moore Transparency</h1>
+               <h1 className="text-4xl md:text-6xl font-black text-gray-900 uppercase tracking-tighter leading-none">Oops, Transparency</h1>
                <p className="text-gray-500 text-lg md:text-xl font-medium">Verified citizen records & county budget oversight.</p>
             </header>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
