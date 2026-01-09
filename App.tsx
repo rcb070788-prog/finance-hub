@@ -853,39 +853,56 @@ export default function App() {
 
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                 {/* Poll Creation */}
-                <div className="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100">
-                  <h3 className="text-xl font-black uppercase mb-8 flex items-center gap-3">
-                    <i className="fa-solid fa-plus-circle text-indigo-600"></i> Deploy New Poll
-                  </h3>
-                  <form onSubmit={async (e) => {
-                    e.preventDefault();
-                    const fd = new FormData(e.currentTarget);
-                    const options = (fd.get('options') as string).split(',').map(s => s.trim());
-                    try {
-                      const { data: poll, error: pError } = await supabase!.from('polls').insert({ 
-                        title: fd.get('title'), 
-                        description: fd.get('description'),
-                        is_anonymous_voting: fd.get('isAnon') === 'on'
-                      }).select().single();
-                      
-                      if (pError) throw pError;
-                      if (poll) {
-                        await supabase!.from('poll_options').insert(options.map(text => ({ poll_id: poll.id, text })));
-                        showToast("Poll Successfully Launched");
-                        fetchPolls();
-                        (e.target as HTMLFormElement).reset();
-                      }
-                    } catch (err: any) { showToast(err.message, 'error'); }
-                  }} className="space-y-4">
-                    <input name="title" required placeholder="Question Title" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-sm outline-none" />
-                    <textarea name="description" placeholder="Poll Details (Supports URLs)..." className="w-full p-4 bg-gray-50 rounded-xl font-bold h-24 text-sm outline-none" />
-                    <input name="options" required placeholder="Options (comma separated: Yes, No, Maybe)" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-sm outline-none" />
-                    <label className="flex items-center gap-3 px-2">
-                      <input type="checkbox" name="isAnon" /> <span className="text-[10px] font-black uppercase text-gray-400">Default to Anonymous?</span>
-                    </label>
-                    <button type="submit" className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase shadow-xl text-xs hover:bg-indigo-700 transition-all">Launch Poll to Citizens</button>
-                  </form>
-                </div>
+<div className="bg-white p-10 rounded-[3rem] shadow-xl border border-gray-100">
+  <h3 className="text-xl font-black uppercase mb-8 flex items-center gap-3">
+    <i className="fa-solid fa-plus-circle text-indigo-600"></i> Deploy New Poll
+  </h3>
+  <form onSubmit={async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const options = (fd.get('options') as string).split(',').map(s => s.trim());
+    
+    try {
+      // 1. Insert the Poll including the closed_at date
+      const { data: poll, error: pError } = await supabase!.from('polls').insert({ 
+        title: fd.get('title'), 
+        description: fd.get('description'),
+        is_anonymous_voting: fd.get('isAnon') === 'on',
+        closed_at: fd.get('closedAt') // <-- Added this
+      }).select().single();
+      
+      if (pError) throw pError;
+
+      // 2. Insert the Options
+      if (poll) {
+        const { error: oError } = await supabase!.from('poll_options').insert(
+          options.map(text => ({ poll_id: poll.id, text }))
+        );
+        if (oError) throw oError;
+
+        showToast("Poll Successfully Launched");
+        fetchPolls();
+        (e.target as HTMLFormElement).reset();
+      }
+    } catch (err: any) { 
+      showToast(err.message, 'error'); 
+    }
+  }} className="space-y-4">
+    <input name="title" required placeholder="Question Title" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-sm outline-none" />
+    <textarea name="description" placeholder="Poll Details (Supports URLs)..." className="w-full p-4 bg-gray-50 rounded-xl font-bold h-24 text-sm outline-none" />
+    <input name="options" required placeholder="Options (comma separated: Yes, No, Maybe)" className="w-full p-4 bg-gray-50 rounded-xl font-bold text-sm outline-none" />
+    
+    <div className="space-y-1">
+      <label className="text-[9px] font-black uppercase text-gray-400 ml-2">Poll Closing Date & Time</label>
+      <input type="datetime-local" name="closedAt" required className="w-full p-4 bg-gray-50 rounded-xl font-bold text-sm outline-none" />
+    </div>
+
+    <label className="flex items-center gap-3 px-2">
+      <input type="checkbox" name="isAnon" /> <span className="text-[10px] font-black uppercase text-gray-400">Default to Anonymous?</span>
+    </label>
+    <button type="submit" className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase shadow-xl text-xs hover:bg-indigo-700 transition-all">Launch Poll to Citizens</button>
+  </form>
+</div>
 
                 {/* Registry Moderation */}
                 <div className="bg-gray-900 p-10 rounded-[3rem] text-white shadow-2xl">
