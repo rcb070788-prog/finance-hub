@@ -83,6 +83,7 @@ export default function App() {
   const [pendingVote, setPendingVote] = useState<{pollId: string, optionId: string, optionText: string, isAnonymous: boolean} | null>(null);
   const [registryModal, setRegistryModal] = useState<{optionText: string, voters: any[]} | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [stagedPollFiles, setStagedPollFiles] = useState<{url: string, name: string}[]>([]);
 
   // --- INITIALIZATION ---
   useEffect(() => {
@@ -193,18 +194,24 @@ const handleBoardFileUpload = async (files: FileList) => {
   };
 
   const handlePollFileUpload = async (files: FileList) => {
-    if (!files || !user || !supabase) return [];
-    const uploadedUrls = [];
+    if (!files || !user || !supabase) return;
+    setIsUploading(true);
+    
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const filePath = `polls/${Date.now()}_${file.name}`;
+      
       const { error: uploadError } = await supabase.storage.from('poll_attachments').upload(filePath, file);
-      if (!uploadError) {
-        const { data: { publicUrl } } = supabase.storage.from('poll_attachments').getPublicUrl(filePath);
-        uploadedUrls.push(publicUrl);
+      
+      if (uploadError) {
+        showToast(uploadError.message, 'error');
+        continue;
       }
+
+      const { data: { publicUrl } } = supabase.storage.from('poll_attachments').getPublicUrl(filePath);
+      setStagedPollFiles(prev => [...prev, { url: publicUrl, name: file.name }]);
     }
-    return uploadedUrls;
+    setIsUploading(false);
   };
   
 const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -805,13 +812,7 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
                 if (options.length < 2) return showToast("Provide at least 2 options", "error");
 
                 try {
-                  const fileInput = e.currentTarget.querySelector('input[name="poll_files"]') as HTMLInputElement;
-                  let attachmentUrls: string[] = [];
-                  
-                  if (fileInput?.files && fileInput.files.length > 0) {
-                    showToast("Uploading attachments...", "success");
-                    attachmentUrls = await handlePollFileUpload(fileInput.files);
-                  }
+                  const attachmentUrls = stagedPollFiles.map(f => f.url);
 
                   showToast("Publishing Poll...", "success");
                   const expiryDate = new Date(fd.get('expires') as string).toISOString();
@@ -825,13 +826,13 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
                   
                   if (pErr) throw pErr;
 
-                  // 2. Insert the Options
                   const optData = options.map(text => ({ poll_id: poll.id, text }));
                   const { error: oErr } = await supabase!.from('poll_options').insert(optData);
                   
                   if (oErr) throw oErr;
 
                   showToast("Poll Published Successfully!");
+                  setStagedPollFiles([]); // Clear previews
                   (e.target as HTMLFormElement).reset();
                   fetchPolls();
                 } catch (err: any) {
@@ -856,19 +857,46 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
                     <textarea name="description" placeholder="Provide background information, links, or context for this poll..." className="w-full p-6 bg-gray-50 rounded-[2rem] border-2 border-transparent focus:border-indigo-600 outline-none font-medium text-xs min-h-[150px] transition-all" />
                   </div>
 
-                  <div className="bg-indigo-50 p-6 rounded-[2rem] border-2 border-dashed border-indigo-200">
-                    <label className="flex items-center gap-4 cursor-pointer">
-                      <div className="bg-indigo-600 text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg">
-                        <i className="fa-solid fa-cloud-arrow-up"></i>
+                  <div className="space-y-4">
+                    <div className="bg-indigo-50 p-6 rounded-[2rem] border-2 border-dashed border-indigo-200">
+                      <label className="flex items-center gap-4 cursor-pointer">
+                        <div className="bg-indigo-600 text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg">
+                          <i className={`fa-solid ${isUploading ? 'fa-spinner animate-spin' : 'fa-cloud-arrow-up'}`}></i>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black uppercase text-indigo-900">Upload Supporting Documents</span>
+                          <span className="text-[9px] font-bold text-indigo-400 uppercase">Photos, PDFs, or site plans</span>
+                        </div>
+                        <input type="file" onChange={(e) => e.target.files && handlePollFileUpload(e.target.files)} multiple className="hidden" />
+                      </label>
+                    </div>
+
+                    {/* --- FILE PREVIEW GRID --- */}
+                    {stagedPollFiles.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-[2rem]">
+                        {stagedPollFiles.map((file, idx) => (
+                          <div key={idx} className="relative group bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+                            <button 
+                              type="button"
+                              onClick={() => setStagedPollFiles(prev => prev.filter((_, i) => i !== idx))}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full text-[10px] flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                            >
+                              <i className="fa-solid fa-xmark"></i>
+                            </button>
+                            <div className="aspect-square rounded-xl bg-indigo-50 flex items-center justify-center overflow-hidden mb-2">
+                              {file.name.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+                                <img src={file.url} alt="Preview" className="w-full h-full object-cover" />
+                              ) : (
+                                <i className="fa-solid fa-file-pdf text-2xl text-indigo-400"></i>
+                              )}
+                            </div>
+                            <p className="text-[8px] font-black uppercase text-gray-400 truncate px-1">{file.name}</p>
+                          </div>
+                        ))}
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-[10px] font-black uppercase text-indigo-900">Upload Supporting Documents</span>
-                        <span className="text-[9px] font-bold text-indigo-400 uppercase">Photos, PDFs, or site plans</span>
-                      </div>
-                      <input type="file" name="poll_files" multiple className="hidden" />
-                  </label>
+                    )}
+                  </div>
                 </div>
-              </div>
 
               <div className="space-y-4">
                   <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Poll Options (Min 2)</label>
