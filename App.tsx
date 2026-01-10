@@ -339,6 +339,32 @@ const handleBoardFileUpload = async (files: FileList) => {
               <button onClick={() => { setCurrentPage('board'); setIsMenuOpen(false); fetchBoardMessages(); }} className="text-xl font-black uppercase block">Let's Talk</button>
               <button onClick={() => { setCurrentPage('suggestions'); setIsMenuOpen(false); fetchSuggestions(); }} className="text-xl font-black uppercase block">Suggestions</button>
               {profile?.is_admin && <button onClick={() => { setCurrentPage('admin'); setIsMenuOpen(false); fetchUsers(); }} className="text-xl font-black uppercase text-red-600 block">Admin Center</button>}
+              
+              <div className="pt-8 mt-8 border-t border-gray-100 space-y-4">
+                {user ? (
+                  <button 
+                    onClick={() => { supabase?.auth.signOut(); setIsMenuOpen(false); }} 
+                    className="text-xl font-black uppercase block text-red-500 hover:text-red-700 transition-colors"
+                  >
+                    Log Out
+                  </button>
+                ) : (
+                  <>
+                    <button 
+                      onClick={() => { setCurrentPage('login'); setIsMenuOpen(false); }} 
+                      className="text-xl font-black uppercase block text-indigo-600"
+                    >
+                      Login
+                    </button>
+                    <button 
+                      onClick={() => { setCurrentPage('signup'); setIsMenuOpen(false); }} 
+                      className="text-xl font-black uppercase block text-gray-400"
+                    >
+                      Register
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
