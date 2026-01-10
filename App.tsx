@@ -367,19 +367,41 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[250] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
             <div className="p-8 border-b border-gray-100 flex justify-between items-center">
-              <div><h3 className="text-xl font-black uppercase">Voter Registry</h3><p className="text-[10px] font-bold text-indigo-600 uppercase">{registryModal.optionText}</p></div>
-              <button onClick={() => setRegistryModal(null)} className="text-gray-300 hover:text-red-500"><i className="fa-solid fa-circle-xmark text-2xl"></i></button>
+              <div>
+                <h3 className="text-xl font-black uppercase tracking-tight">Voter Registry</h3>
+                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{registryModal.optionText}</p>
+              </div>
+              <button onClick={() => setRegistryModal(null)} className="text-gray-300 hover:text-red-500 transition-colors">
+                <i className="fa-solid fa-circle-xmark text-2xl"></i>
+              </button>
             </div>
-            <div className="p-4 overflow-y-auto space-y-2">
-              {registryModal.voters.map((v, i) => (
-                <div key={i} className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-2xl transition-colors">
-                  <UserAvatar url={v.profiles?.avatar_url} isAnonymous={v.is_anonymous} size="md" />
-                  <div className="flex flex-col">
-                    <span className="text-sm font-black text-gray-800">{v.is_anonymous === true ? "Verified Voter" : v.profiles?.full_name}</span>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase">District {v.profiles?.district}</span>
+            <div className="p-6 overflow-y-auto space-y-3 custom-scrollbar">
+              {registryModal.voters.map((v, i) => {
+                const isAnon = !!v.is_anonymous;
+                return (
+                  <div key={i} className="flex items-center gap-4 p-4 bg-gray-50 rounded-[1.5rem] border border-transparent hover:border-indigo-100 transition-all">
+                    <UserAvatar url={isAnon ? undefined : v.profiles?.avatar_url} isAnonymous={isAnon} size="md" />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-black text-gray-900 uppercase">
+                        {isAnon ? "Verified Voter" : (v.profiles?.full_name || "Unknown Voter")}
+                      </span>
+                      <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-tight">
+                        District {v.profiles?.district || "N/A"}
+                      </span>
+                    </div>
+                    {isAnon && (
+                      <div className="ml-auto">
+                        <i className="fa-solid fa-shield-halved text-gray-300 text-xs"></i>
+                      </div>
+                    )}
                   </div>
+                );
+              })}
+              {registryModal.voters.length === 0 && (
+                <div className="text-center py-10">
+                  <p className="text-[10px] font-black uppercase text-gray-400">No votes recorded for this option.</p>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </div>
@@ -400,17 +422,29 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
             
             <p className="text-center text-gray-500 text-sm leading-tight px-4">
               You are selecting: <br/>
-              <span className="text-indigo-600 font-black uppercase text-xs">"{pendingVote.optionText}"</span>
+              <span className="text-indigo-600 font-black uppercase text-xs break-words whitespace-normal block mt-1">"{pendingVote.optionText}"</span>
             </p>
 
-            <div className="bg-gray-50 p-6 rounded-2xl flex items-center justify-between">
-               <div className="flex flex-col">
-                 <span className="text-[10px] font-black uppercase leading-none">Vote Anonymously?</span>
-                 <span className="text-[8px] font-bold text-gray-400 uppercase mt-1">Hide name from registry</span>
-               </div>
-               <button onClick={() => setPendingVote({...pendingVote, isAnonymous: !pendingVote.isAnonymous})} className={`w-12 h-6 rounded-full relative transition-colors ${pendingVote.isAnonymous ? 'bg-indigo-600' : 'bg-gray-300'}`}>
-                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${pendingVote.isAnonymous ? 'left-7' : 'left-1'}`}></div>
-               </button>
+            <div className="space-y-4">
+              <div className="bg-gray-50 p-6 rounded-2xl flex items-center justify-between">
+                 <div className="flex flex-col">
+                   <span className="text-[10px] font-black uppercase leading-none">Vote Anonymously?</span>
+                   <span className="text-[8px] font-bold text-gray-400 uppercase mt-1">Hide name from registry</span>
+                 </div>
+                 <button onClick={() => setPendingVote({...pendingVote, isAnonymous: !pendingVote.isAnonymous})} className={`w-12 h-6 rounded-full relative transition-colors ${pendingVote.isAnonymous ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${pendingVote.isAnonymous ? 'left-7' : 'left-1'}`}></div>
+                 </button>
+              </div>
+              <div className="text-center border-t border-gray-100 pt-4">
+                <p className="text-[8px] font-black uppercase text-gray-400 mb-1">Registry Preview:</p>
+                <p className="text-[10px] font-black uppercase text-indigo-600 flex items-center justify-center gap-2">
+                  {pendingVote.isAnonymous ? (
+                    <><i className="fa-solid fa-user-shield"></i> Verified Voter</>
+                  ) : (
+                    <><i className="fa-solid fa-circle-user"></i> {profile?.full_name}</>
+                  )}
+                </p>
+              </div>
             </div>
 
             <div className="space-y-3 pt-2">
@@ -664,7 +698,7 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
                         className={`w-full text-left p-6 rounded-2xl border-2 relative overflow-hidden flex justify-between items-start gap-4 transition-all ${isCurrentSelection ? 'border-indigo-600 ring-2 ring-indigo-600/20' : 'border-gray-100'}`}
                       >
                         {(existingVote || isExpired) && <div className="absolute inset-y-0 left-0 bg-indigo-50 transition-all duration-1000" style={{ width: `${percent}%` }}></div>}
-                        <span className="relative z-10 text-xs font-black uppercase flex-1 break-words leading-tight">{opt.text}</span>
+                        <span className="relative z-10 text-xs font-black uppercase flex-1 break-words whitespace-normal leading-tight">{opt.text}</span>
                         {(existingVote || isExpired) && (
                           <div className="relative z-10 text-right shrink-0">
                             <span className="text-sm font-black text-indigo-600">{percent}%</span>
