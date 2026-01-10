@@ -132,8 +132,14 @@ export default function App() {
 
   const fetchBoardMessages = async () => {
     if (!supabase) return;
-    const { data } = await supabase.from('board_messages').select('*, profiles(full_name, district)').order('created_at', { ascending: false });
-    setBoardMessages(data || []);
+    const { data, error } = await supabase
+      .from('board_messages')
+      .select('*, profiles(full_name, district, avatar_url)')
+      .order('created_at', { ascending: false });
+    
+    if (!error && data) {
+      setBoardMessages(data);
+    }
   };
 
   const fetchUsers = async () => {
@@ -502,7 +508,6 @@ const handleBoardFileUpload = async (files: FileList) => {
           </div>
         )}
 
-        {/* START POINT */}
         {currentPage === 'board' && (
           <div className="max-w-7xl mx-auto pb-20 animate-slide-up">
             <div className="flex flex-col-reverse lg:flex-row gap-8">
@@ -528,7 +533,6 @@ const handleBoardFileUpload = async (files: FileList) => {
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 h-[60vh] lg:h-[75vh] overflow-y-auto pr-2 custom-scrollbar">
-        {/* END POINT */}
                   {filteredMessages.filter(m => !m.parent_id).map((msg) => (
                     <div key={msg.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
                       <div className="flex justify-between items-start mb-6">
@@ -603,14 +607,15 @@ const handleBoardFileUpload = async (files: FileList) => {
                         attachment_urls: fileUrls
                       });
 
-                        if (error) {
+                       if (error) {
                         showToast(error.message, 'error');
                       } else { 
                         showToast("Message Recorded"); 
                         setSelectedOfficials([]); 
+                        setSearchQuery(''); // This clears the search filter
                         setIsOfficialDropdownOpen(false);
                         (e.target as HTMLFormElement).reset(); 
-                        await fetchBoardMessages(); 
+                        await fetchBoardMessages(); // This reloads the list
                       }
                     }} className="space-y-4">
                       
