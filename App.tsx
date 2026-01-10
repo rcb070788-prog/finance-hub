@@ -84,6 +84,7 @@ export default function App() {
   const [registryModal, setRegistryModal] = useState<{optionText: string, voters: any[]} | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [stagedPollFiles, setStagedPollFiles] = useState<{url: string, name: string}[]>([]);
+  const [pollFilter, setPollFilter] = useState<'active' | 'completed'>('active');
 
   // --- INITIALIZATION ---
   useEffect(() => {
@@ -102,7 +103,18 @@ export default function App() {
     });
 
     fetchAllData();
-    return () => subscription.unsubscribe();
+
+    // REAL-TIME SUBSCRIPTION: Listen for new votes to update progress bars
+    const votesSubscription = supabase
+      .channel('schema-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes' }, () => fetchPolls())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_comments' }, () => fetchPolls())
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+      supabase.removeChannel(votesSubscription);
+    };
   }, []);
 
   useEffect(() => {
@@ -270,6 +282,18 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     const { error } = await supabase.from('poll_votes').upsert({ poll_id: pendingVote.pollId, option_id: pendingVote.optionId, user_id: user.id, is_anonymous: Boolean(pendingVote.isAnonymous) }, { onConflict: 'poll_id,user_id' });
     if (error) showToast(error.message, 'error'); else { showToast("Vote recorded"); fetchPolls(); }
     setPendingVote(null);
+  };
+
+  const handleClosePoll = async (pollId: string) => {
+    if (!supabase) return;
+    const { error } = await supabase.from('polls').update({ expires_at: new Date().toISOString() }).eq('id', pollId);
+    if (error) showToast(error.message, "error"); else { showToast("Poll Closed Early"); fetchPolls(); }
+  };
+
+  const handleDeletePoll = async (pollId: string) => {
+    if (!supabase || !window.confirm("Permanently delete this poll and all its data?")) return;
+    const { error } = await supabase.from('polls').delete().eq('id', pollId);
+    if (error) showToast(error.message, "error"); else { showToast("Poll Deleted"); fetchPolls(); }
   };
 
   const filteredMessages = useMemo(() => {
@@ -505,28 +529,65 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
           </div>
         )}
         {currentPage === 'polls' && !selectedPoll && (
-          <div className="max-w-4xl mx-auto space-y-8">
-            <h2 className="text-4xl font-black uppercase">Community Polls</h2>
+          <div className="max-w-4xl mx-auto space-y-8 animate-slide-up">
+            <div className="flex flex-col md:flex-row justify-between items-end gap-6">
+              <div>
+                <h2 className="text-4xl font-black uppercase tracking-tighter">Community Polls</h2>
+                <p className="text-indigo-600 font-bold text-[10px] uppercase tracking-widest">Voice your opinion on county decisions</p>
+              </div>
+              <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100">
+                <button 
+                  onClick={() => setPollFilter('active')}
+                  className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${pollFilter === 'active' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400'}`}
+                >
+                  Active
+                </button>
+                <button 
+                  onClick={() => setPollFilter('completed')}
+                  className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${pollFilter === 'completed' ? 'bg-gray-900 text-white shadow-lg' : 'text-gray-400'}`}
+                >
+                  Completed
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 gap-6">
-              {polls.map(poll => {
-                const voted = poll.poll_votes?.some((v: any) => v.user_id === user?.id);
-                return (
-                  <div key={poll.id} onClick={() => setSelectedPoll(poll)} className="bg-white p-8 rounded-[2.5rem] shadow-sm border hover:shadow-lg transition-all cursor-pointer flex flex-col sm:flex-row justify-between items-center gap-6">
-                    <div className="min-w-0 flex-1">
-  <h3 className="text-2xl font-black uppercase break-words">{poll.title}</h3>
-  <div className="flex items-center gap-2">
-    <p className="text-gray-400 text-[10px] font-black uppercase">{poll.poll_votes?.length || 0} Votes</p>
-    <span className="text-gray-300 text-[10px]">•</span>
-    <p className="text-red-500 text-[10px] font-black uppercase">
-      <i className="fa-regular fa-clock mr-1"></i>
-      Ends {formatDate(poll.expires_at)}
-    </p>
-  </div>
-</div>
-                    <button className={`px-8 py-4 rounded-xl font-black uppercase text-[10px] ${voted ? 'bg-gray-100 text-gray-500' : 'bg-indigo-600 text-white'}`}>{voted ? 'View Results' : 'Vote & Discuss'}</button>
-                  </div>
-                );
-              })}
+              {polls
+                .filter(poll => {
+                  const isExpired = new Date(poll.expires_at) < new Date();
+                  return pollFilter === 'active' ? !isExpired : isExpired;
+                })
+                .map(poll => {
+                  const voted = poll.poll_votes?.some((v: any) => v.user_id === user?.id);
+                  const isExpired = new Date(poll.expires_at) < new Date();
+                  return (
+                    <div key={poll.id} onClick={() => setSelectedPoll(poll)} className="bg-white p-8 rounded-[2.5rem] shadow-sm border hover:shadow-lg transition-all cursor-pointer flex flex-col sm:flex-row justify-between items-center gap-6 group">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-2xl font-black uppercase break-words group-hover:text-indigo-600 transition-colors">{poll.title}</h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-gray-400 text-[10px] font-black uppercase">{poll.poll_votes?.length || 0} Votes</p>
+                          <span className="text-gray-200 text-[10px]">•</span>
+                          <p className={`${isExpired ? 'text-gray-400' : 'text-red-500'} text-[10px] font-black uppercase`}>
+                            <i className="fa-regular fa-clock mr-1"></i>
+                            {isExpired ? `Closed ${formatDate(poll.expires_at)}` : `Ends ${formatDate(poll.expires_at)}`}
+                          </p>
+                        </div>
+                      </div>
+                      <button className={`px-8 py-4 rounded-xl font-black uppercase text-[10px] whitespace-nowrap ${voted || isExpired ? 'bg-gray-100 text-gray-500' : 'bg-indigo-600 text-white shadow-indigo-200 shadow-lg'}`}>
+                        {isExpired ? 'Final Results' : voted ? 'View Results' : 'Vote & Discuss'}
+                      </button>
+                    </div>
+                  );
+                })}
+              
+              {polls.filter(poll => {
+                const isExpired = new Date(poll.expires_at) < new Date();
+                return pollFilter === 'active' ? !isExpired : isExpired;
+              }).length === 0 && (
+                <div className="p-20 text-center bg-white rounded-[3rem] border-4 border-dashed border-gray-100">
+                   <p className="text-gray-300 font-black uppercase text-xs italic">No {pollFilter} polls found.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -949,6 +1010,50 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </section>
+
+            {/* --- MANAGE EXISTING POLLS SECTION --- */}
+            <section className="space-y-6">
+              <div className="px-4">
+                <h2 className="text-4xl font-black uppercase tracking-tighter leading-none">Manage Polls</h2>
+                <p className="text-gray-400 font-bold text-[10px] uppercase mt-1">Archive or delete live community polls</p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                {polls.map(poll => {
+                  const isExpired = new Date(poll.expires_at) < new Date();
+                  return (
+                    <div key={poll.id} className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h4 className="font-black uppercase text-sm truncate">{poll.title}</h4>
+                          <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${isExpired ? 'bg-gray-100 text-gray-400' : 'bg-green-100 text-green-600'}`}>
+                            {isExpired ? 'Closed' : 'Active'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase">Created {formatDate(poll.created_at)} • {poll.poll_votes?.length || 0} Total Votes</p>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        {!isExpired && (
+                          <button 
+                            onClick={() => handleClosePoll(poll.id)}
+                            className="px-4 py-2 bg-gray-900 text-white rounded-xl text-[9px] font-black uppercase hover:bg-gray-800 transition-all"
+                          >
+                            Close Early
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => handleDeletePoll(poll.id)}
+                          className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all"
+                        >
+                          <i className="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           </div>
