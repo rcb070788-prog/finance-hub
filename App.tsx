@@ -162,7 +162,20 @@ export default function App() {
       showToast("Photo Updated");
     } catch (err: any) { showToast(err.message, "error"); } finally { setIsUploading(false); }
   };
-
+const handleBoardFileUpload = async (files: FileList) => {
+    if (!files || !user || !supabase) return [];
+    const uploadedUrls = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const filePath = `board/${Date.now()}_${file.name}`;
+      const { error: uploadError } = await supabase.storage.from('board_attachments').upload(filePath, file);
+      if (!uploadError) {
+        const { data: { publicUrl } } = supabase.storage.from('board_attachments').getPublicUrl(filePath);
+        uploadedUrls.push(publicUrl);
+      }
+    }
+    return uploadedUrls;
+  };
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsVerifying(true);
@@ -463,77 +476,161 @@ export default function App() {
           </div>
         )}
 
-        {/* BOARD PAGE */}
         {currentPage === 'board' && (
-          <div className="max-w-5xl mx-auto space-y-8 pb-20 animate-slide-up">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div><h2 className="text-4xl font-black uppercase tracking-tighter">Public Record</h2><p className="text-indigo-600 font-bold text-[10px] uppercase">Direct communication with Officials</p></div>
-              <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="SEARCH MESSAGES..." className="px-4 py-3 bg-white border border-gray-100 rounded-2xl text-[10px] font-bold w-64 outline-none focus:ring-2 ring-indigo-500/20" />
-            </div>
-            {user && (
-              <div className="bg-indigo-600 p-8 rounded-[2.5rem] shadow-xl">
-                <form onSubmit={async (e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); if (selectedOfficials.length === 0) return showToast("Select at least one official", "error");
-                  const { error } = await supabase!.from('board_messages').insert({ user_id: user.id, content: fd.get('content'), recipient_names: selectedOfficials.join(', '), district: profile.district });
-                  if (error) showToast(error.message, 'error'); else { showToast("Message Posted"); setSelectedOfficials([]); (e.target as HTMLFormElement).reset(); fetchBoardMessages(); }
-                }} className="space-y-4">
-                  <div className="relative">
-                    <button type="button" onClick={() => setIsOfficialDropdownOpen(!isOfficialDropdownOpen)} className="w-full p-5 bg-indigo-700 text-white rounded-2xl text-left text-xs md:text-sm font-black uppercase flex justify-between items-center shadow-inner">
-                      <span>{selectedOfficials.length > 0 ? `To: ${selectedOfficials.join(', ')}` : "Select Officials to Address"}</span>
-                      <i className="fa-solid fa-chevron-down"></i>
-                    </button>
-                    {isOfficialDropdownOpen && (
-                      <div className="absolute top-full mt-2 w-full bg-white rounded-2xl shadow-2xl z-[60] p-4 grid grid-cols-2 md:grid-cols-3 gap-2 border border-gray-100 max-h-[400px] md:max-h-none overflow-y-auto">
-                        {OFFICIALS.map(off => (
-  <label key={off.id} className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-xl cursor-pointer">
-    <input 
-      type="checkbox" 
-      className="mt-1"
-      checked={selectedOfficials.includes(off.name)} 
-      onChange={(e) => { 
-        if (e.target.checked) setSelectedOfficials([...selectedOfficials, off.name]); 
-        else setSelectedOfficials(selectedOfficials.filter(n => n !== off.name)); 
-      }} 
-    />
-    <div className="flex flex-col">
-      <span className="text-xs md:text-base font-black uppercase text-gray-900 leading-tight">{off.name}</span>
-      <span className="text-[10px] md:text-xs font-bold uppercase text-indigo-600 mt-1">{off.office}</span>
-    </div>
-  </label>
-))}
-                        <button type="button" onClick={() => setIsOfficialDropdownOpen(false)} className="col-span-2 md:col-span-3 mt-4 py-4 bg-gray-900 text-white rounded-xl text-xs md:text-sm font-black uppercase tracking-widest shadow-lg">Done</button>
-                      </div>
-                    )}
+          <div className="max-w-7xl mx-auto pb-20 animate-slide-up">
+            <div className="flex flex-col lg:flex-row gap-8">
+              
+              {/* --- LEFT SIDE: PUBLIC RECORD FEED --- */}
+              <div className="lg:w-2/3 space-y-6">
+                <div className="flex justify-between items-end">
+                  <div>
+                    <h2 className="text-4xl font-black uppercase tracking-tighter">Public Record</h2>
+                    <p className="text-indigo-600 font-bold text-[10px] uppercase">Official Community Correspondence</p>
                   </div>
-                  <textarea name="content" required placeholder="What's on your mind? Messages are public." className="w-full p-6 bg-white rounded-[1.5rem] text-sm min-h-[120px] outline-none" />
-                  <button className="w-full py-4 bg-white text-indigo-600 rounded-2xl font-black uppercase text-xs shadow-lg">Post Public Message</button>
-                </form>
-              </div>
-            )}
-            <div className="grid grid-cols-1 gap-4">
-              {filteredMessages.map((msg) => (
-                <div key={msg.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
-                      <UserAvatar url={msg.profiles?.avatar_url} size="md" />
-                      <div>
-  <p className="text-xs font-black uppercase leading-none">{msg.profiles?.full_name}</p>
-  <p className="text-[9px] font-bold text-indigo-600 uppercase">
-    District {msg.profiles?.district} • {formatDate(msg.created_at)}
-  </p>
-</div>                    </div>
-                    <div className="text-right flex flex-wrap gap-1 justify-end max-w-[200px]">
-                      {msg.recipient_names?.split(', ').map((name: string) => (
-                        <span key={name} className="px-2 py-1 bg-gray-100 rounded text-[7px] font-black uppercase text-gray-500">{name}</span>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black uppercase text-gray-400">Search Records</p>
+                    <input 
+                      value={searchQuery} 
+                      onChange={(e) => setSearchQuery(e.target.value)} 
+                      placeholder="NAME, OFFICE, OR KEYWORD..." 
+                      className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold w-48 md:w-64 outline-none focus:ring-2 ring-indigo-500/20 shadow-sm" 
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 h-[75vh] overflow-y-auto pr-4 custom-scrollbar">
+                  {filteredMessages.filter(m => !m.parent_id).map((msg) => (
+                    <div key={msg.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="flex items-center gap-4">
+                          <UserAvatar url={msg.profiles?.avatar_url} size="md" />
+                          <div>
+                            <p className="text-sm font-black uppercase leading-none">{msg.profiles?.full_name}</p>
+                            <p className="text-[10px] font-bold text-indigo-600 uppercase">District {msg.profiles?.district} • {formatDate(msg.created_at)}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1 justify-end max-w-[250px]">
+                          {msg.recipient_names?.split(', ').map((name: string) => (
+                            <span key={name} className="px-2 py-1 bg-gray-50 rounded text-[8px] font-black uppercase text-gray-400 border">{name}</span>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div className="text-gray-800 text-base leading-relaxed break-words whitespace-pre-wrap mb-6">{renderTextWithLinks(msg.content)}</div>
+                      
+                      {/* Attachments Section */}
+                      {msg.attachment_urls?.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-6 p-4 bg-gray-50 rounded-2xl">
+                          {msg.attachment_urls.map((url: string, i: number) => (
+                            <a key={i} href={url} target="_blank" rel="noreferrer" className="px-4 py-2 bg-white border border-gray-200 text-indigo-600 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 hover:bg-indigo-600 hover:text-white transition-all">
+                              <i className="fa-solid fa-file-pdf"></i> Attachment {i + 1}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Official Replies (Display Only) */}
+                      {boardMessages.filter(reply => reply.parent_id === msg.id).map(reply => (
+                        <div key={reply.id} className="mt-6 p-6 bg-indigo-50 rounded-[2rem] border-l-8 border-indigo-600 relative">
+                          <div className="absolute -top-3 left-6 bg-indigo-600 text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">Official Response</div>
+                          <p className="text-[10px] font-bold text-indigo-400 uppercase mb-2">{formatDate(reply.created_at)}</p>
+                          <p className="text-sm text-gray-800 font-medium leading-relaxed">{reply.content}</p>
+                        </div>
                       ))}
                     </div>
-                  </div>
-                  <div className="text-gray-700 text-sm leading-relaxed break-words whitespace-pre-wrap">{renderTextWithLinks(msg.content)}</div>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              {/* --- RIGHT SIDE: MESSAGE FORM --- */}
+              <div className="lg:w-1/3">
+                {user ? (
+                  <div className="sticky top-8 bg-indigo-600 p-8 rounded-[3rem] shadow-2xl space-y-6 border-4 border-indigo-500">
+                    <div>
+                      <h3 className="text-3xl font-black text-white uppercase leading-none">Let's Talk</h3>
+                      <p className="text-indigo-200 text-[10px] font-bold uppercase mt-2 tracking-widest">Direct communication with officials</p>
+                    </div>
+
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      const fd = new FormData(e.currentTarget);
+                      if (selectedOfficials.length === 0) return showToast("Select at least one official", "error");
+                      
+                      const fileInput = e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement;
+                      const files = fileInput.files;
+                      let fileUrls: string[] = [];
+                      
+                      if (files && files.length > 0) {
+                        showToast("Uploading files...", "success");
+                        fileUrls = await handleBoardFileUpload(files);
+                      }
+
+                      const { error } = await supabase!.from('board_messages').insert({ 
+                        user_id: user.id, 
+                        content: fd.get('content'), 
+                        recipient_names: selectedOfficials.join(', '), 
+                        district: profile.district,
+                        attachment_urls: fileUrls
+                      });
+
+                      if (error) showToast(error.message, 'error');
+                      else { 
+                        showToast("Message Recorded"); 
+                        setSelectedOfficials([]); 
+                        (e.target as HTMLFormElement).reset(); 
+                        fetchBoardMessages(); 
+                      }
+                    }} className="space-y-4">
+                      
+                      <div className="relative">
+                        <button type="button" onClick={() => setIsOfficialDropdownOpen(!isOfficialDropdownOpen)} className="w-full p-5 bg-indigo-700 text-white rounded-2xl text-left text-xs font-black uppercase flex justify-between items-center border border-indigo-500">
+                          <span className="truncate">{selectedOfficials.length > 0 ? `To: ${selectedOfficials.join(', ')}` : "Select Officials"}</span>
+                          <i className={`fa-solid fa-chevron-${isOfficialDropdownOpen ? 'up' : 'down'}`}></i>
+                        </button>
+                        {isOfficialDropdownOpen && (
+                          <div className="absolute bottom-full mb-2 w-full bg-white rounded-2xl shadow-2xl z-[60] p-4 grid grid-cols-1 gap-2 border border-gray-100 max-h-[350px] overflow-y-auto">
+                            {OFFICIALS.map(off => (
+                              <label key={off.id} className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-xl cursor-pointer">
+                                <input type="checkbox" className="mt-1" checked={selectedOfficials.includes(off.name)} onChange={(e) => { if (e.target.checked) setSelectedOfficials([...selectedOfficials, off.name]); else setSelectedOfficials(selectedOfficials.filter(n => n !== off.name)); }} />
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-black uppercase text-gray-900 leading-tight">{off.name}</span>
+                                  <span className="text-[10px] font-bold uppercase text-indigo-600">{off.office}</span>
+                                </div>
+                              </label>
+                            ))}
+                            <button type="button" onClick={() => setIsOfficialDropdownOpen(false)} className="py-4 bg-gray-900 text-white rounded-xl text-xs font-black uppercase">Done</button>
+                          </div>
+                        )}
+                      </div>
+
+                      <textarea name="content" required placeholder="What is your message for the public record?" className="w-full p-6 bg-white rounded-[2rem] text-sm min-h-[180px] outline-none placeholder:text-gray-300 focus:ring-4 ring-white/20" />
+                      
+                      <div className="bg-indigo-700 p-5 rounded-2xl border border-indigo-500">
+                        <label className="flex items-center gap-4 cursor-pointer text-white">
+                          <div className="bg-white text-indigo-600 w-10 h-10 rounded-full flex items-center justify-center shadow-lg"><i className="fa-solid fa-paperclip"></i></div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black uppercase leading-none">Add Attachments</span>
+                            <span className="text-[8px] font-bold text-indigo-300 uppercase mt-1">Images or Documents</span>
+                          </div>
+                          <input type="file" multiple className="hidden" />
+                        </label>
+                      </div>
+
+                      <button className="w-full py-6 bg-white text-indigo-600 rounded-3xl font-black uppercase text-xs shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all">Submit to Public Record</button>
+                    </form>
+                  </div>
+                ) : (
+                  <div className="bg-white p-12 rounded-[3.5rem] border-4 border-dashed border-gray-100 text-center">
+                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6 text-gray-200 text-3xl"><i className="fa-solid fa-lock"></i></div>
+                    <p className="text-gray-900 font-black uppercase text-sm mb-2">Verification Required</p>
+                    <p className="text-gray-400 font-bold uppercase text-[9px] mb-6">Login as a verified voter to contact officials</p>
+                    <button onClick={() => setCurrentPage('login')} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg">Login / Register</button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
-
         {/* SUGGESTIONS PAGE */}
         {currentPage === 'suggestions' && (
           <div className="max-w-4xl mx-auto space-y-8 animate-slide-up">
