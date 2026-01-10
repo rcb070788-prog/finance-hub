@@ -134,11 +134,20 @@ export default function App() {
     if (!supabase) return;
     const { data, error } = await supabase
       .from('board_messages')
-      .select('*, profiles(full_name, district, avatar_url)')
+      .select(`
+        *,
+        profiles (
+          full_name,
+          district,
+          avatar_url
+        )
+      `)
       .order('created_at', { ascending: false });
     
-    if (!error && data) {
-      setBoardMessages(data);
+    if (error) {
+      console.error("Fetch Error:", error.message);
+    } else {
+      setBoardMessages(data || []);
     }
   };
 
@@ -211,9 +220,17 @@ const handleBoardFileUpload = async (files: FileList) => {
   };
 
   const filteredMessages = useMemo(() => {
-    if (!searchQuery) return boardMessages;
+    const messages = boardMessages || [];
+    if (!searchQuery) return messages;
     const q = searchQuery.toLowerCase();
-    return boardMessages.filter(m => m.profiles?.full_name?.toLowerCase().includes(q) || m.recipient_names?.toLowerCase().includes(q) || m.content?.toLowerCase().includes(q));
+    return messages.filter(m => {
+      const authorName = m.profiles?.full_name || 'Verified Voter';
+      const content = m.content || '';
+      const recipients = m.recipient_names || '';
+      return authorName.toLowerCase().includes(q) || 
+             content.toLowerCase().includes(q) || 
+             recipients.toLowerCase().includes(q);
+    });
   }, [boardMessages, searchQuery]);
 
   // --- RENDER HELPERS (RESTORING THREADED COMMENTS) ---
