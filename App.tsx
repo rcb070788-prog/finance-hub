@@ -866,16 +866,11 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
                         <span className="text-[9px] font-bold text-indigo-400 uppercase">Photos, PDFs, or site plans</span>
                       </div>
                       <input type="file" name="poll_files" multiple className="hidden" />
-                    </label>
-                  </div>
+                  </label>
                 </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Context / Description</label>
-                    <textarea name="description" placeholder="Provide background information or context for this poll..." className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-600 outline-none font-medium text-xs min-h-[120px] transition-all" />
-                  </div>
-                </div>
+              </div>
 
-                <div className="space-y-4">
+              <div className="space-y-4">
                   <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Poll Options (Min 2)</label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input name="opt1" required placeholder="OPTION 1" className="p-4 bg-gray-50 rounded-xl border border-gray-100 font-bold uppercase text-[10px]" />
