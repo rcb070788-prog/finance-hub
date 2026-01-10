@@ -646,6 +646,9 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
                   const existingVote = selectedPoll.poll_votes?.find((v: any) => v.user_id === user?.id);
                   const isCurrentSelection = existingVote?.option_id === opt.id;
                   const isExpired = new Date(selectedPoll.expires_at) < new Date();
+                  
+                  // THIS LINE BELOW FIXES THE ERROR:
+                  const hasVotedAny = selectedPoll.poll_votes?.some((v: any) => v.user_id === user?.id);
 
                   return (
                     <div key={opt.id} className="space-y-3">
@@ -660,16 +663,18 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
                         } as any)} 
                         className={`w-full text-left p-6 rounded-2xl border-2 relative overflow-hidden flex justify-between items-start gap-4 transition-all ${isCurrentSelection ? 'border-indigo-600 ring-2 ring-indigo-600/20' : 'border-gray-100'}`}
                       >
-                        {existingVote && <div className="absolute inset-y-0 left-0 bg-indigo-50 transition-all duration-1000" style={{ width: `${percent}%` }}></div>}
+                        {(existingVote || isExpired) && <div className="absolute inset-y-0 left-0 bg-indigo-50 transition-all duration-1000" style={{ width: `${percent}%` }}></div>}
                         <span className="relative z-10 text-xs font-black uppercase flex-1 break-words leading-tight">{opt.text}</span>
-                        {existingVote && (
+                        {(existingVote || isExpired) && (
                           <div className="relative z-10 text-right shrink-0">
                             <span className="text-sm font-black text-indigo-600">{percent}%</span>
                             <span className="block text-[8px] font-bold text-gray-400 uppercase">({votes.length} Votes)</span>
                           </div>
                         )}
                       </button>
-                      {hasVotedAny && votes.length > 0 && (
+                      
+                      {/* Now that hasVotedAny is defined, this section will work */}
+                      {(hasVotedAny || isExpired) && votes.length > 0 && (
                         <div className="flex items-center gap-2 px-2 cursor-pointer" onClick={() => setRegistryModal({ optionText: opt.text, voters: votes })}>
                           <div className="flex -space-x-2">
                             {votes.slice(0, 5).map((v: any, i: number) => <UserAvatar key={i} url={v.profiles?.avatar_url} isAnonymous={v.is_anonymous} size="sm" />)}
