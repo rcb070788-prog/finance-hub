@@ -388,17 +388,39 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
       {/* --- PENDING VOTE MODAL --- */}
       {pendingVote && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 space-y-6">
-            <h3 className="text-xl font-black uppercase text-center">Confirm Your Vote</h3>
-            <p className="text-center text-gray-500 text-sm">Voting for: <span className="text-indigo-600 font-bold">"{pendingVote.optionText}"</span></p>
+          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-8 space-y-6 animate-slide-up">
+            <div className="text-center space-y-2">
+              <h3 className="text-xl font-black uppercase">{(pendingVote as any).isChanging ? "Change Your Vote?" : "Confirm Your Vote"}</h3>
+              {(pendingVote as any).isChanging && (
+                <p className="bg-amber-50 text-amber-600 text-[9px] font-black uppercase py-2 px-4 rounded-full inline-block border border-amber-100">
+                  <i className="fa-solid fa-triangle-exclamation mr-1"></i> This will replace your previous vote
+                </p>
+              )}
+            </div>
+            
+            <p className="text-center text-gray-500 text-sm leading-tight px-4">
+              You are selecting: <br/>
+              <span className="text-indigo-600 font-black uppercase text-xs">"{pendingVote.optionText}"</span>
+            </p>
+
             <div className="bg-gray-50 p-6 rounded-2xl flex items-center justify-between">
-               <span className="text-[10px] font-black uppercase">Vote Anonymously?</span>
-               <button onClick={() => setPendingVote({...pendingVote, isAnonymous: !pendingVote.isAnonymous})} className={`w-12 h-6 rounded-full relative ${pendingVote.isAnonymous ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+               <div className="flex flex-col">
+                 <span className="text-[10px] font-black uppercase leading-none">Vote Anonymously?</span>
+                 <span className="text-[8px] font-bold text-gray-400 uppercase mt-1">Hide name from registry</span>
+               </div>
+               <button onClick={() => setPendingVote({...pendingVote, isAnonymous: !pendingVote.isAnonymous})} className={`w-12 h-6 rounded-full relative transition-colors ${pendingVote.isAnonymous ? 'bg-indigo-600' : 'bg-gray-300'}`}>
                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${pendingVote.isAnonymous ? 'left-7' : 'left-1'}`}></div>
                </button>
             </div>
-            <button onClick={confirmVote} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs">Submit Vote</button>
-            <button onClick={() => setPendingVote(null)} className="w-full text-gray-400 font-black uppercase text-[10px]">Cancel</button>
+
+            <div className="space-y-3 pt-2">
+              <button onClick={confirmVote} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs shadow-xl shadow-indigo-200 hover:scale-[1.02] active:scale-[0.98] transition-all">
+                {(pendingVote as any).isChanging ? "Continue & Update Vote" : "Submit Vote"}
+              </button>
+              <button onClick={() => setPendingVote(null)} className="w-full py-2 text-gray-400 font-black uppercase text-[10px] hover:text-gray-600 transition-colors">
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -473,7 +495,7 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
       <main className="flex-grow overflow-y-auto container mx-auto px-4 py-8 custom-scrollbar">
         {currentPage === 'home' && !selectedCategory && (
           <div className="max-w-4xl mx-auto space-y-12 py-10">
-            <h1 className="text-4xl md:text-6xl font-black text-gray-900 uppercase tracking-tighter text-center">Oops, Transparency</h1>
+            <h1 className="text-4xl md:text-6xl font-black text-gray-900 uppercase tracking-tighter text-center">Moore Transparency</h1>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                {CATEGORIES.map(cat => (
                  <div key={cat.id} onClick={() => setSelectedCategory(cat.id)} className="bg-white p-8 rounded-[2.5rem] shadow-sm border hover:shadow-xl transition-all cursor-pointer flex items-center gap-6">
@@ -621,13 +643,31 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
                   const votes = selectedPoll.poll_votes?.filter((v: any) => v.option_id === opt.id) || [];
                   const totalVotes = selectedPoll.poll_votes?.length || 0;
                   const percent = totalVotes ? Math.round((votes.length / totalVotes) * 100) : 0;
-                  const hasVotedAny = selectedPoll.poll_votes?.some((v: any) => v.user_id === user?.id);
+                  const existingVote = selectedPoll.poll_votes?.find((v: any) => v.user_id === user?.id);
+                  const isCurrentSelection = existingVote?.option_id === opt.id;
+                  const isExpired = new Date(selectedPoll.expires_at) < new Date();
+
                   return (
                     <div key={opt.id} className="space-y-3">
-                      <button onClick={() => !hasVotedAny && setPendingVote({ pollId: selectedPoll.id, optionId: opt.id, optionText: opt.text, isAnonymous: false })} className="w-full text-left p-6 rounded-2xl border-2 relative overflow-hidden flex justify-between items-center">
-                        {hasVotedAny && <div className="absolute inset-y-0 left-0 bg-indigo-50" style={{ width: `${percent}%` }}></div>}
-                        <span className="relative z-10 text-xs font-black uppercase">{opt.text}</span>
-                        {hasVotedAny && <div className="relative z-10 text-right"><span className="text-sm font-black text-indigo-600">{percent}%</span><span className="block text-[8px] font-bold text-gray-400 uppercase">({votes.length} Votes)</span></div>}
+                      <button 
+                        disabled={isExpired || isCurrentSelection}
+                        onClick={() => setPendingVote({ 
+                          pollId: selectedPoll.id, 
+                          optionId: opt.id, 
+                          optionText: opt.text, 
+                          isAnonymous: existingVote?.is_anonymous ?? false,
+                          isChanging: !!existingVote 
+                        } as any)} 
+                        className={`w-full text-left p-6 rounded-2xl border-2 relative overflow-hidden flex justify-between items-start gap-4 transition-all ${isCurrentSelection ? 'border-indigo-600 ring-2 ring-indigo-600/20' : 'border-gray-100'}`}
+                      >
+                        {existingVote && <div className="absolute inset-y-0 left-0 bg-indigo-50 transition-all duration-1000" style={{ width: `${percent}%` }}></div>}
+                        <span className="relative z-10 text-xs font-black uppercase flex-1 break-words leading-tight">{opt.text}</span>
+                        {existingVote && (
+                          <div className="relative z-10 text-right shrink-0">
+                            <span className="text-sm font-black text-indigo-600">{percent}%</span>
+                            <span className="block text-[8px] font-bold text-gray-400 uppercase">({votes.length} Votes)</span>
+                          </div>
+                        )}
                       </button>
                       {hasVotedAny && votes.length > 0 && (
                         <div className="flex items-center gap-2 px-2 cursor-pointer" onClick={() => setRegistryModal({ optionText: opt.text, voters: votes })}>
@@ -822,7 +862,7 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
         {/* SUGGESTIONS PAGE */}
         {currentPage === 'suggestions' && (
           <div className="max-w-4xl mx-auto space-y-8 animate-slide-up">
-            <h2 className="text-4xl font-black uppercase text-center">Project Suggestions</h2>
+            <h2 className="text-4xl font-black uppercase text-center">Suggestion Box</h2>
             {user && (
               <form onSubmit={async (e) => {
                 e.preventDefault();
