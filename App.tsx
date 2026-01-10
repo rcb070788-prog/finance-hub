@@ -509,9 +509,16 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
 
         {currentPage === 'polls' && selectedPoll && (
           <div className="max-w-4xl mx-auto space-y-8 pb-20">
-            <button onClick={() => setSelectedPoll(null)} className="text-[10px] font-black uppercase text-gray-400"><i className="fa-solid fa-arrow-left"></i> All Polls</button>
-            <div className="bg-white p-10 rounded-[3rem] shadow-xl space-y-10">
-              <h2 className="text-3xl md:text-5xl font-black uppercase leading-none">{selectedPoll.title}</h2>
+            <button onClick={() => setSelectedPoll(null)} className="text-[10px] font-black uppercase text-gray-400 hover:text-indigo-600 transition-colors"><i className="fa-solid fa-arrow-left mr-2"></i> All Polls</button>
+            <div className="bg-white p-10 md:p-16 rounded-[3rem] shadow-xl space-y-10 border border-gray-100">
+              <div className="space-y-4">
+                <h2 className="text-3xl md:text-5xl font-black uppercase leading-tight tracking-tighter text-gray-900">{selectedPoll.title}</h2>
+                {selectedPoll.description && (
+                  <p className="text-gray-500 text-sm md:text-base leading-relaxed font-medium bg-gray-50 p-6 rounded-[2rem]">
+                    {selectedPoll.description}
+                  </p>
+                )}
+              </div>
               <div className="space-y-8">
                 {selectedPoll.poll_options?.map((opt: any) => {
                   const votes = selectedPoll.poll_votes?.filter((v: any) => v.option_id === opt.id) || [];
@@ -772,12 +779,13 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
 
                 try {
                   showToast("Publishing Poll...", "success");
-                  // 1. Insert the Poll (Fixed to include closed_at)
+                  // 1. Insert the Poll (Includes Title, Description/Context, and Expiry)
                   const expiryDate = new Date(fd.get('expires') as string).toISOString();
                   const { data: poll, error: pErr } = await supabase!.from('polls').insert({ 
                     title: fd.get('title'), 
+                    description: fd.get('description'),
                     expires_at: expiryDate,
-                    closed_at: expiryDate // Adding this to satisfy the database constraint
+                    closed_at: expiryDate 
                   }).select().single();
                   
                   if (pErr) throw pErr;
@@ -796,14 +804,20 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
                 }
               }} className="space-y-6">
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Poll Question / Title</label>
-                    <input name="title" required placeholder="Ex: SHOULD WE REZONE DISTRICT 2?" className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-600 outline-none font-bold uppercase text-xs transition-all" />
+                <div className="grid grid-cols-1 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Poll Question / Title</label>
+                      <input name="title" required placeholder="Ex: Should we rezone District 2?" className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-600 outline-none font-bold text-xs transition-all" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Expiration Date</label>
+                      <input name="expires" type="datetime-local" required className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-600 outline-none font-bold text-xs transition-all" />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Expiration Date</label>
-                    <input name="expires" type="datetime-local" required className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-600 outline-none font-bold text-xs transition-all" />
+                    <label className="text-[10px] font-black uppercase text-gray-400 ml-2">Context / Description</label>
+                    <textarea name="description" placeholder="Provide background information or context for this poll..." className="w-full p-5 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-indigo-600 outline-none font-medium text-xs min-h-[120px] transition-all" />
                   </div>
                 </div>
 
