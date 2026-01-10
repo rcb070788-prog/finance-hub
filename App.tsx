@@ -810,12 +810,12 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
           </div>
         )}
 
-        {currentPage === 'login' && (
+{currentPage === 'login' && (
           <div className="max-w-lg mx-auto py-10 bg-white p-8 rounded-[3rem] shadow-2xl text-center">
             <h2 className="text-2xl font-black uppercase text-indigo-600 mb-8">Secure Access</h2>
             <form className="space-y-4" onSubmit={async (e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); const { error } = await supabase!.auth.signInWithPassword({ email: fd.get('email') as string, password: fd.get('password') as string }); if (error) showToast(error.message, 'error'); else setCurrentPage('home'); }}>
-              <input name="email" type="email" placeholder="EMAIL" required className="w-full p-4 bg-gray-50 rounded-xl text-xs" />
-              <input name="password" type="password" placeholder="PASSWORD" required className="w-full p-4 bg-gray-50 rounded-xl text-xs" />
+              <input name="email" type="email" placeholder="EMAIL" required className="w-full p-4 bg-gray-50 rounded-xl text-xs font-bold" />
+              <input name="password" type="password" placeholder="PASSWORD" required className="w-full p-4 bg-gray-50 rounded-xl text-xs font-bold" />
               <button className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase shadow-xl">Enter Portal</button>
             </form>
             <button onClick={() => setCurrentPage('signup')} className="mt-6 text-[10px] font-black uppercase text-gray-400">Need to register as a voter?</button>
