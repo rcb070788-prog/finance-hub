@@ -512,8 +512,8 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
                 const voted = poll.poll_votes?.some((v: any) => v.user_id === user?.id);
                 return (
                   <div key={poll.id} onClick={() => setSelectedPoll(poll)} className="bg-white p-8 rounded-[2.5rem] shadow-sm border hover:shadow-lg transition-all cursor-pointer flex flex-col sm:flex-row justify-between items-center gap-6">
-                    <div>
-  <h3 className="text-2xl font-black uppercase">{poll.title}</h3>
+                    <div className="min-w-0 flex-1">
+  <h3 className="text-2xl font-black uppercase break-words">{poll.title}</h3>
   <div className="flex items-center gap-2">
     <p className="text-gray-400 text-[10px] font-black uppercase">{poll.poll_votes?.length || 0} Votes</p>
     <span className="text-gray-300 text-[10px]">•</span>
@@ -536,10 +536,10 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
             <button onClick={() => setSelectedPoll(null)} className="text-[10px] font-black uppercase text-gray-400 hover:text-indigo-600 transition-colors"><i className="fa-solid fa-arrow-left mr-2"></i> All Polls</button>
             <div className="bg-white p-10 md:p-16 rounded-[3rem] shadow-xl space-y-10 border border-gray-100">
               <div className="space-y-4">
-                <h2 className="text-3xl md:text-5xl font-black uppercase leading-tight tracking-tighter text-gray-900">{selectedPoll.title}</h2>
+                <h2 className="text-3xl md:text-5xl font-black uppercase leading-tight tracking-tighter text-gray-900 break-words">{selectedPoll.title}</h2>
                 {selectedPoll.description && (
                   <div className="space-y-4">
-                    <p className="text-gray-500 text-sm md:text-base leading-relaxed font-medium bg-gray-50 p-8 rounded-[2.5rem]">
+                    <p className="text-gray-500 text-sm md:text-base leading-relaxed font-medium bg-gray-50 p-8 rounded-[2.5rem] break-words whitespace-pre-wrap">
                       {selectedPoll.description}
                     </p>
                     {selectedPoll.attachments?.length > 0 && (
