@@ -184,7 +184,9 @@ export default function App() {
       const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file, { upsert: true });
       if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      const { error: updateError } = await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
+      // Append a timestamp to the URL to force the browser to bypass cache and show the new photo
+      const urlWithCacheBuster = `${publicUrl}?t=${Date.now()}`;
+      const { error: updateError } = await supabase.from('profiles').update({ avatar_url: urlWithCacheBuster }).eq('id', user.id);
       if (updateError) throw updateError;
       fetchProfile(user.id);
       showToast("Photo Updated");
