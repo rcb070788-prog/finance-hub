@@ -139,7 +139,15 @@ export default function App() {
 
   const fetchSuggestions = async () => {
     if (!supabase) return;
-    const { data } = await supabase.from('suggestions').select('*, profiles(full_name, district)').order('created_at', { ascending: false });
+    // Fetch suggestions with profiles, comments (threaded), and reactions
+    const { data } = await supabase
+      .from('suggestions')
+      .select(`
+        *, 
+        profiles(full_name, district, avatar_url),
+        suggestion_comments(*, profiles(full_name, district, avatar_url), suggestion_reactions(*))
+      `)
+      .order('created_at', { ascending: false });
     setSuggestions(data || []);
   };
 
@@ -287,10 +295,15 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
       setIsVerifying(false); 
     }
   };
-  const handleReaction = async (commentId: string, type: 'like' | 'dislike') => {
+  const handleReaction = async (commentId: string, type: 'like' | 'dislike', table: 'comment_reactions' | 'suggestion_reactions' = 'comment_reactions') => {
     if (!user || !supabase) return setCurrentPage('login');
-    const { error } = await supabase.from('comment_reactions').upsert({ comment_id: commentId, user_id: user.id, reaction_type: type }, { onConflict: 'comment_id,user_id' });
-    if (error) showToast("Reaction failed", "error"); else fetchPolls();
+    const { error } = await supabase.from(table).upsert({ comment_id: commentId, user_id: user.id, reaction_type: type }, { onConflict: 'comment_id,user_id' });
+    if (error) {
+      showToast("Reaction failed", "error");
+    } else {
+      if (table === 'comment_reactions') fetchPolls();
+      else fetchSuggestions();
+    }
   };
 
   const confirmVote = async () => {
@@ -345,6 +358,50 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
   }, [boardMessages, searchQuery]);
 
   // --- RENDER HELPERS (RESTORING THREADED COMMENTS) ---
+  const renderSuggestionComments = (comments: any[], suggestionId: string, parentId: string | null = null, depth = 0) => {
+    return (comments || []).filter(c => c.parent_id === parentId).map(comment => {
+      const reactions = comment.suggestion_reactions || [];
+      const likes = reactions.filter((r: any) => r.reaction_type === 'like').length;
+      const dislikes = reactions.filter((r: any) => r.reaction_type === 'dislike').length;
+      const userReaction = reactions.find((r: any) => r.user_id === user?.id)?.reaction_type;
+      return (
+        <div key={comment.id} className={`${depth > 0 ? 'ml-4 mt-2 border-l-2 border-indigo-50 pl-3' : 'bg-white p-3 rounded-xl mb-2 border border-gray-100'}`}>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2 mb-1">
+               <UserAvatar url={comment.profiles?.avatar_url} size="sm" />
+               <span className="text-[8px] font-black uppercase text-indigo-600">
+                {comment.profiles?.full_name} • {formatDate(comment.created_at)}
+               </span>
+            </div>
+            <div className="text-gray-700 text-[10px] leading-tight break-words whitespace-pre-wrap">{comment.content}</div>
+            <div className="flex gap-3 mt-2 text-[8px] font-black uppercase">
+              <button onClick={() => handleReaction(comment.id, 'like', 'suggestion_reactions')} className={userReaction === 'like' ? 'text-indigo-600' : 'text-gray-400'}>
+                <i className="fa-solid fa-thumbs-up"></i> {likes}
+              </button>
+              <button onClick={() => handleReaction(comment.id, 'dislike', 'suggestion_reactions')} className={userReaction === 'dislike' ? 'text-red-500' : 'text-gray-400'}>
+                <i className="fa-solid fa-thumbs-down"></i> {dislikes}
+              </button>
+              <button onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)} className="text-gray-400">Reply</button>
+            </div>
+            {replyTo === comment.id && (
+              <form onSubmit={async (e) => { 
+                e.preventDefault(); 
+                const fd = new FormData(e.currentTarget); 
+                await supabase?.from('suggestion_comments').insert({ suggestion_id: suggestionId, user_id: user.id, content: fd.get('content'), parent_id: comment.id }); 
+                setReplyTo(null); 
+                fetchSuggestions(); 
+              }} className="mt-2 flex gap-1">
+                <input name="content" autoFocus placeholder="Reply..." className="flex-grow p-2 bg-gray-50 rounded-lg text-[10px] outline-none border" />
+                <button type="submit" className="bg-indigo-600 text-white px-3 py-1 rounded-lg text-[8px] font-black uppercase">Send</button>
+              </form>
+            )}
+          </div>
+          {renderSuggestionComments(comments, suggestionId, comment.id, depth + 1)}
+        </div>
+      );
+    });
+  };
+
   const renderComments = (pollComments: any[], pollId: string, parentId: string | null = null, depth = 0) => {
     return (pollComments || []).filter(c => c.parent_id === parentId && !c.is_hidden).map(comment => {
       const reactions = comment.comment_reactions || [];
@@ -967,51 +1024,94 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
         )}
         {/* SUGGESTIONS PAGE */}
         {currentPage === 'suggestions' && (
-          <div className="max-w-4xl mx-auto space-y-8 animate-slide-up">
-            <h2 className="text-4xl font-black uppercase text-center">Suggestion Box</h2>
-            {user && (
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                const suggestionData = {
-                  user_id: user.id,
-                  title: fd.get('title') as string,
-                  description: fd.get('description') as string,
-                  category: fd.get('category') as string
-                };
+          <div className="max-w-7xl mx-auto space-y-8 animate-slide-up pb-20">
+            <div className="flex justify-between items-end mb-8">
+              <div>
+                <h2 className="text-5xl font-black uppercase tracking-tighter">Suggestion Box</h2>
+                <p className="text-indigo-600 font-bold text-[10px] uppercase tracking-[0.2em]">Community Improvement Proposals</p>
+              </div>
+              <button className="text-[10px] font-black uppercase text-gray-400 hover:text-indigo-600 transition-all border-b-2 border-transparent hover:border-indigo-600 pb-1">
+                Archived Suggestions <i className="fa-solid fa-box-archive ml-1"></i>
+              </button>
+            </div>
 
-                const { error } = await supabase!.from('suggestions').insert(suggestionData);
-                
-                if (error) {
-                  showToast(error.message, 'error');
-                } else {
-                  showToast("Suggestion Submitted Successfully!");
-                  fetchSuggestions();
-                  (e.target as HTMLFormElement).reset();
-                }
-              }} className="bg-white p-8 rounded-[2.5rem] shadow-xl border-2 border-dashed border-indigo-100 space-y-4">
-                <input name="title" required placeholder="PROJECT TITLE" className="w-full p-4 bg-gray-50 rounded-xl text-xs font-black uppercase" />
-                <textarea name="description" required placeholder="Explain why this project matters..." className="w-full p-4 bg-gray-50 rounded-xl text-xs min-h-[100px]" />
-                <div className="flex gap-4">
-                  <select name="category" className="bg-gray-50 p-4 rounded-xl text-[10px] font-black uppercase outline-none">
-                    <option>Infrastructure</option><option>Education</option><option>Public Safety</option><option>Parks & Rec</option>
-                  </select>
-                  <button className="flex-grow py-4 bg-indigo-600 text-white rounded-xl font-black uppercase text-[10px]">Submit Proposal</button>
-                </div>
-              </form>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {suggestions.map(sug => (
-                <div key={sug.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-                  <span className="px-3 py-1 bg-indigo-100 text-indigo-600 rounded-full text-[8px] font-black uppercase mb-3 inline-block">{sug.category}</span>
-                  <h4 className="text-lg font-black uppercase mb-2 leading-tight">{sug.title}</h4>
-                  <p className="text-gray-500 text-xs mb-4 line-clamp-3">{sug.description}</p>
-                  <div className="pt-4 border-t border-gray-50 text-[9px] font-black uppercase text-gray-400 flex justify-between">
-  <span>By {sug.profiles?.full_name} • Dist {sug.profiles?.district}</span>
-  <span className="text-indigo-400">{formatDate(sug.created_at)}</span>
-</div>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* --- LEFT COLUMN: THE BOX --- */}
+              <div className="lg:col-span-4 sticky top-8">
+                {user ? (
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    const fd = new FormData(e.currentTarget);
+                    const { error } = await supabase!.from('suggestions').insert({
+                      user_id: user.id,
+                      title: fd.get('title'),
+                      description: fd.get('description'),
+                      category: 'General' // Default category since dropdown was removed
+                    });
+                    
+                    if (error) showToast(error.message, 'error');
+                    else { showToast("Proposal Submitted!"); fetchSuggestions(); (e.target as HTMLFormElement).reset(); }
+                  }} className="bg-indigo-600 p-8 rounded-[3rem] shadow-2xl space-y-4 border-4 border-indigo-500">
+                    <h3 className="text-white font-black uppercase text-xl mb-4">New Proposal</h3>
+                    <input name="title" required placeholder="SUMMARY / TITLE" className="w-full p-5 bg-white rounded-2xl text-[10px] font-black uppercase outline-none shadow-inner" />
+                    <textarea name="description" required placeholder="DETAIL YOUR SUGGESTION..." className="w-full p-5 bg-white rounded-2xl text-xs min-h-[150px] outline-none shadow-inner" />
+                    <button className="w-full py-5 bg-white text-indigo-600 rounded-2xl font-black uppercase text-xs shadow-xl hover:scale-[1.02] transition-all">Submit Suggestion</button>
+                  </form>
+                ) : (
+                  <div className="bg-white p-10 rounded-[3rem] border-4 border-dashed border-gray-100 text-center">
+                    <p className="text-gray-400 font-black uppercase text-xs">Login to submit suggestions</p>
+                    <button onClick={() => setCurrentPage('login')} className="mt-4 px-8 py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase">Login</button>
+                  </div>
+                )}
+              </div>
+
+              {/* --- RIGHT COLUMN: THE FEED --- */}
+              <div className="lg:col-span-8 space-y-6">
+                {suggestions.filter(s => (s.suggestion_comments?.length || 0) >= 0).map(sug => (
+                  <div key={sug.id} className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col md:flex-row">
+                    <div className="p-8 md:w-1/2 border-b md:border-b-0 md:border-r border-gray-50 flex flex-col">
+                      <div className="flex items-center gap-3 mb-4">
+                        <UserAvatar url={sug.profiles?.avatar_url} size="md" />
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-gray-900 leading-none">{sug.profiles?.full_name}</p>
+                          <p className="text-[8px] font-bold text-indigo-400 uppercase mt-1">Dist {sug.profiles?.district} • {formatDate(sug.created_at)}</p>
+                        </div>
+                      </div>
+                      <h4 className="text-xl font-black uppercase mb-3 leading-tight text-indigo-600">{sug.title}</h4>
+                      <p className="text-gray-600 text-xs font-medium leading-relaxed mb-6 break-words whitespace-pre-wrap">{sug.description}</p>
+                      
+                      <div className="mt-auto flex items-center gap-2">
+                         <span className="px-3 py-1 bg-gray-100 rounded-full text-[8px] font-black uppercase text-gray-400">Status: Under Review</span>
+                      </div>
+                    </div>
+
+                    <div className="p-6 md:w-1/2 bg-gray-50/50 flex flex-col h-[400px]">
+                      <h5 className="text-[9px] font-black uppercase text-indigo-400 mb-4 tracking-widest px-2">Engagement Feed</h5>
+                      <div className="flex-grow overflow-y-auto custom-scrollbar px-2">
+                        {user ? (
+                           <form onSubmit={async (e) => { 
+                             e.preventDefault(); 
+                             const fd = new FormData(e.currentTarget); 
+                             await supabase?.from('suggestion_comments').insert({ suggestion_id: sug.id, user_id: user.id, content: fd.get('content') }); 
+                             (e.target as HTMLFormElement).reset(); 
+                             fetchSuggestions(); 
+                           }} className="mb-4 flex gap-2">
+                             <input name="content" required placeholder="Add a comment..." className="flex-grow p-3 bg-white rounded-xl text-[10px] outline-none border border-gray-100" />
+                             <button type="submit" className="bg-indigo-600 text-white px-4 py-1 rounded-xl text-[8px] font-black uppercase">Post</button>
+                           </form>
+                        ) : null}
+                        {renderSuggestionComments(sug.suggestion_comments || [], sug.id)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {suggestions.length === 0 && (
+                  <div className="p-20 text-center bg-white rounded-[3rem] border-4 border-dashed border-gray-50">
+                    <p className="text-gray-300 font-black uppercase text-xs italic">No active proposals yet.</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
