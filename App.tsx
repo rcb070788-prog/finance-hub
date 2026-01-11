@@ -1094,7 +1094,13 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
                       <p className="text-gray-600 text-xs font-medium leading-relaxed mb-6 break-words whitespace-pre-wrap">{sug.description}</p>
                       
                       <div className="mt-auto flex items-center gap-2">
-                         <span className="px-3 py-1 bg-gray-100 rounded-full text-[8px] font-black uppercase text-gray-400">Status: Under Review</span>
+                         <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${
+                           sug.status === 'Completed' ? 'bg-green-100 text-green-600' : 
+                           sug.status === 'Scheduled' ? 'bg-blue-100 text-blue-600' : 
+                           'bg-gray-100 text-gray-400'
+                         }`}>
+                           Status: {sug.status || 'Under Review'}
+                         </span>
                       </div>
                     </div>
 
