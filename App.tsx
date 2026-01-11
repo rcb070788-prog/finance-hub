@@ -181,14 +181,18 @@ export default function App() {
       setIsUploading(true);
       const fileExt = file.name.split('.').pop();
       const filePath = `${user.id}/avatar.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file, { upsert: true });
+      // Explicitly set contentType so the browser knows it's an image
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file, { 
+        upsert: true,
+        contentType: file.type 
+      });
       if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      // Append a timestamp to the URL to force the browser to bypass cache and show the new photo
       const urlWithCacheBuster = `${publicUrl}?t=${Date.now()}`;
       const { error: updateError } = await supabase.from('profiles').update({ avatar_url: urlWithCacheBuster }).eq('id', user.id);
       if (updateError) throw updateError;
-      fetchProfile(user.id);
+      // Manually sync local state immediately so the UI reflects the change without waiting for the fetch
+      setProfile((prev: any) => ({ ...prev, avatar_url: urlWithCacheBuster }));
       showToast("Photo Updated");
     } catch (err: any) { showToast(err.message, "error"); } finally { setIsUploading(false); }
   };
