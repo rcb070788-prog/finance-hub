@@ -732,8 +732,10 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
                             pollId: selectedPoll.id, 
                             optionId: opt.id, 
                             optionText: opt.text, 
-                            // DEFAULT: If changing vote, use previous privacy setting. If new, default to public (false).
-                            isAnonymous: userExistingVote ? !!userExistingVote.is_anonymous : false,
+                            // Inherit previous privacy preference using strict boolean/string check
+                            isAnonymous: userExistingVote 
+                              ? (userExistingVote.is_anonymous === true || userExistingVote.is_anonymous === 'true') 
+                              : false,
                             isChanging: !!userExistingVote 
                           } as any);
                         }} 
