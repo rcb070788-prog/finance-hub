@@ -278,9 +278,26 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
   };
 
   const confirmVote = async () => {
-    if (!pendingVote || !supabase) return;
-    const { error } = await supabase.from('poll_votes').upsert({ poll_id: pendingVote.pollId, option_id: pendingVote.optionId, user_id: user.id, is_anonymous: Boolean(pendingVote.isAnonymous) }, { onConflict: 'poll_id,user_id' });
-    if (error) showToast(error.message, 'error'); else { showToast("Vote recorded"); fetchPolls(); }
+    if (!pendingVote || !supabase || !user) return;
+    
+    // Explicitly cast to boolean to ensure DB consistency
+    const cleanVotePayload = {
+      poll_id: pendingVote.pollId,
+      option_id: pendingVote.optionId,
+      user_id: user.id,
+      is_anonymous: !!pendingVote.isAnonymous 
+    };
+
+    const { error } = await supabase
+      .from('poll_votes')
+      .upsert(cleanVotePayload, { onConflict: 'poll_id,user_id' });
+
+    if (error) {
+      showToast(error.message, 'error');
+    } else {
+      showToast("Vote recorded successfully");
+      fetchPolls();
+    }
     setPendingVote(null);
   };
 
@@ -376,26 +393,29 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
               </button>
             </div>
             <div className="p-6 overflow-y-auto space-y-3 custom-scrollbar">
-              {registryModal.voters.map((v, i) => {
-                // STRICT CHECK: Only treat as anonymous if explicitly true
-                const isExplicitlyAnonymous = v.is_anonymous === true;
-                const displayName = isExplicitlyAnonymous ? "Verified Voter" : (v.profiles?.full_name || "Verified Voter");
-                const avatarUrl = isExplicitlyAnonymous ? undefined : v.profiles?.avatar_url;
-
+              {registryModal.voters.map((v: any, i: number) => {
+                // Determine privacy state
+                const isShielded = !!v.is_anonymous;
+                
                 return (
-                  <div key={i} className="flex items-center gap-4 p-4 bg-gray-50 rounded-[1.5rem] border border-transparent hover:border-indigo-100 transition-all">
-                    <UserAvatar url={avatarUrl} isAnonymous={isExplicitlyAnonymous} size="md" />
+                  <div key={i} className="flex items-center gap-4 p-5 bg-gray-50 rounded-[2rem] border border-transparent hover:border-indigo-100 transition-all group">
+                    <UserAvatar 
+                      url={isShielded ? undefined : v.profiles?.avatar_url} 
+                      isAnonymous={isShielded} 
+                      size="md" 
+                    />
                     <div className="flex flex-col">
-                      <span className="text-sm font-black text-gray-900 uppercase">
-                        {displayName}
+                      <span className="text-sm font-black text-gray-900 uppercase tracking-tight">
+                        {isShielded ? "Verified Voter" : (v.profiles?.full_name || "Verified Voter")}
                       </span>
-                      <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-tight">
-                        District {v.profiles?.district || "Unknown"}
+                      <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest opacity-70">
+                        District {v.profiles?.district || "???"}
                       </span>
                     </div>
-                    {isExplicitlyAnonymous && (
-                      <div className="ml-auto">
-                        <i className="fa-solid fa-user-shield text-gray-300 text-xs"></i>
+                    {isShielded && (
+                      <div className="ml-auto flex items-center gap-2 bg-white px-3 py-1.5 rounded-full shadow-sm border border-gray-100">
+                        <i className="fa-solid fa-user-shield text-indigo-600 text-[10px]"></i>
+                        <span className="text-[8px] font-black uppercase text-gray-400">Private</span>
                       </div>
                     )}
                   </div>
@@ -692,15 +712,20 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
                     <div key={opt.id} className="space-y-3">
                       <button 
                         disabled={isExpired || isCurrentSelection}
-                        onClick={() => setPendingVote({ 
-                          pollId: selectedPoll.id, 
-                          optionId: opt.id, 
-                          optionText: opt.text, 
-                          // Strictly default to false for new votes; respect existing choice only if it exists
-                          isAnonymous: existingVote ? !!existingVote.is_anonymous : false,
-                          isChanging: !!existingVote 
-                        } as any)} 
-                        className={`w-full text-left p-6 rounded-2xl border-2 relative overflow-hidden flex justify-between items-start gap-4 transition-all ${isCurrentSelection ? 'border-indigo-600 ring-2 ring-indigo-600/20' : 'border-gray-100'}`}
+                        onClick={() => {
+                          // Find the user's current vote for THIS poll (regardless of which option)
+                          const userExistingVote = selectedPoll.poll_votes?.find((v: any) => v.user_id === user?.id);
+                          
+                          setPendingVote({ 
+                            pollId: selectedPoll.id, 
+                            optionId: opt.id, 
+                            optionText: opt.text, 
+                            // DEFAULT: If changing vote, use previous privacy setting. If new, default to public (false).
+                            isAnonymous: userExistingVote ? !!userExistingVote.is_anonymous : false,
+                            isChanging: !!userExistingVote 
+                          } as any);
+                        }} 
+                        className={`w-full text-left p-6 rounded-[2rem] border-2 relative overflow-hidden flex justify-between items-start gap-4 transition-all ${isCurrentSelection ? 'border-indigo-600 ring-4 ring-indigo-600/10' : 'border-gray-100 hover:border-indigo-200'}`}
                       >
                         {(existingVote || isExpired) && <div className="absolute inset-y-0 left-0 bg-indigo-50 transition-all duration-1000" style={{ width: `${percent}%` }}></div>}
                         <span className="relative z-10 text-xs font-black uppercase flex-1 break-words whitespace-normal leading-tight">{opt.text}</span>
