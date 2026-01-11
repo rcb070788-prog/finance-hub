@@ -1042,11 +1042,13 @@ const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
                   <form onSubmit={async (e) => {
                     e.preventDefault();
                     const fd = new FormData(e.currentTarget);
+                    const suggestionText = fd.get('description');
                     const { error } = await supabase!.from('suggestions').insert({
                       user_id: user.id,
                       title: fd.get('title'),
-                      description: fd.get('description'),
-                      category: 'General' // Default category since dropdown was removed
+                      description: suggestionText,
+                      content: suggestionText, // Map to both columns for backward compatibility
+                      category: 'General'
                     });
                     
                     if (error) showToast(error.message, 'error');
